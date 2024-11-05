@@ -109,3 +109,29 @@ SELECT group_col, x, y, z
 FROM pivot_table
 UNPIVOT (agg_col FOR pivot_col IN (x, y, z)) #selected columns that are not in pivot clause will be ungrouped, new agg_col will be created with values as values of pivot table, pivot_col will be created with values of x,y,z, this will give group_col, agg_col & pivot_col as table
 ```
+
+## Gap & Island Problem
+``` SQL
+# Use ROW_NUMBER() or DENSE_RANK() to create consecutive numbers on rows/dates
+# Find difference between consecutive identifier & row/rank to get groups (use rank in case of dups in consecutive identifier)
+# COUNT DISTINCT groups with GROUP BY groups to get each group (island)
+# Include HAVING condition to filter for groups that meet your criteria
+WITH groups AS (
+  SELECT DISTINCT
+    id,
+    date,
+    date - DENSE_RANK() OVER (PARTITION BY id ORDER BY date) AS group
+    -- or use DATE_SUB(date, INTERVAL DENSE_RANK() OVER (PARTITION BY id ORDER BY date) DAY) AS group
+  FROM table
+)
+
+SELECT
+  id,
+  group,
+  COUNT(*) AS consec_count
+FROM groups
+GROUP BY
+  id,
+  group
+HAVING consec_count >= 5
+```
