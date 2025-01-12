@@ -82,6 +82,7 @@ for (k in kernel_list) {
 # Question 2.2.3
 # Installing & importing packages
 library(kknn)
+library(caret)
 
 # Set seed for reproducibility
 set.seed(31)
@@ -105,6 +106,8 @@ for (i in 1:100) {
     best_accuracy <- accuracy
   }
 }
+
+confusionMatrix(data=fit, reference=as.factor(test_set$R1))
 
 cat("Best value of k is:", best_i, "\n")
 cat("Using the best value of k, the accuracy is:", best_accuracy*100, "%")

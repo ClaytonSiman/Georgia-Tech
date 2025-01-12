@@ -47,7 +47,6 @@ The accuracy of the model is: `86.4%`
 
 ```r
 # Installing & importing packages
-install.packages("kernlab")
 library(kernlab)
 ```
 
@@ -201,7 +200,7 @@ Question 2.2.3
 **A:**
 The following code takes the approach below to find a good value of k for the k-nearest-neighbors classifier for this data, as well as the performance of this model:
 
-- Install and import the "kknn" library
+- Install and import the "kknn" & "caret" library
 - Prepare train and test subsets from the credit card dataframe
   
   - Set a seed number to ensure reproducibility
@@ -214,13 +213,27 @@ The following code takes the approach below to find a good value of k for the k-
   - Train the model using the training dataset with the first 10 columns as predictors and the 11th column as the response, with the "optimal" kernel, predictor scaling set to TRUE, distance parameter to be 1, and the chosen value of k for the loop
   - Fit the model and use it to predict on the test dataset to compare with the actual response values to calculate the model accuracy
   - Compare the model accuracies for each value of k and return only the best performing value of k and its corresponding model accuracy
+  - Plot the confusion matrix to observe more in-depth metrics of the predictions
 
 With this approach, the best value of k is `44` and the model accuracy with this k is about `86.3%`
 
+**Confusion Matrix**
+
+Prediction 0 - Actual 0 (True Negative) : 67
+
+Prediction 1 - Actual 0 (False Positive): 3
+
+Prediction 0 - Actual 1 (False Negative): 15
+
+Prediction 1 - Actual 1 (True Positive) : 46
+
+Sensitivity : `95.71%`          
+Specificity : `75.41%`
+
 ```r
 # Installing & importing packages
-install.packages("kknn")
 library(kknn)
+library(caret)
 ```
 
 ```r
@@ -260,3 +273,7 @@ cat("Using the best value of k, the accuracy is:", best_accuracy*100, "%")
 Best value of k is: `44`
 
 Using the best value of k, the accuracy is: `86.25954 %`
+
+```r
+confusionMatrix(data=fit, reference=as.factor(test_set$R1))
+```

@@ -411,11 +411,10 @@ may not perform well against new data and we may have an overfitted
 model such that it achieves a high accuracy rate on trained data but not
 on new, unseen data.</em></p>
 <pre class="r"><code># Installing &amp; importing packages
-install.packages(&quot;kernlab&quot;)
 library(kernlab)</code></pre>
 <pre class="r"><code># Read credit card data into df
 directory &lt;- &quot;/path/to/file/&quot;
-df &lt;- read.table(directory + &quot;credit_card_data-headers.txt&quot;, header = T, sep = &quot;\t&quot;)</code></pre>
+df &lt;- read.table(paste0(directory, &quot;credit_card_data-headers.txt&quot;), header = T, sep = &quot;\t&quot;)</code></pre>
 <pre class="r"><code># Set seed for reproducibility
 set.seed(31)</code></pre>
 <pre class="r"><code># Find the best performing value of C based on the accuracy of predictions
@@ -553,7 +552,7 @@ set. Don’t forget to scale the data (scale=TRUE in kknn).</p>
 find a good value of k for the k-nearest-neighbors classifier for this
 data, as well as the performance of this model:</p>
 <ul>
-<li><p>Install and import the “kknn” library</p></li>
+<li><p>Install and import the “kknn” &amp; “caret” library</p></li>
 <li><p>Prepare train and test subsets from the credit card dataframe</p>
 <ul>
 <li>Set a seed number to ensure reproducibility</li>
@@ -572,13 +571,22 @@ the chosen value of k for the loop</li>
 with the actual response values to calculate the model accuracy</li>
 <li>Compare the model accuracies for each value of k and return only the
 best performing value of k and its corresponding model accuracy</li>
+<li>Plot the confusion matrix to observe more in-depth metrics of the
+predictions</li>
 </ul></li>
 </ul>
 <p>With this approach, the best value of k is <code>44</code> and the
 model accuracy with this k is about <code>86.3%</code></p>
+<p><strong>Confusion Matrix</strong></p>
+<p>Prediction 0 - Actual 0 (True Negative) : 67</p>
+<p>Prediction 1 - Actual 0 (False Positive): 3</p>
+<p>Prediction 0 - Actual 1 (False Negative): 15</p>
+<p>Prediction 1 - Actual 1 (True Positive) : 46</p>
+<p>Sensitivity : <code>95.71%</code><br />
+Specificity : <code>75.41%</code></p>
 <pre class="r"><code># Installing &amp; importing packages
-install.packages(&quot;kknn&quot;)
-library(kknn)</code></pre>
+library(kknn)
+library(caret)</code></pre>
 <pre class="r"><code># Set seed for reproducibility
 set.seed(31)</code></pre>
 <pre class="r"><code># Create train-test split
@@ -606,6 +614,7 @@ cat(&quot;Using the best value of k, the accuracy is:&quot;, best_accuracy*100, 
 <p>Best value of k is: <code>44</code></p>
 <p>Using the best value of k, the accuracy is:
 <code>86.25954 %</code></p>
+<pre class="r"><code>confusionMatrix(data=fit, reference=as.factor(test_set$R1))</code></pre>
 </div>
 
 
