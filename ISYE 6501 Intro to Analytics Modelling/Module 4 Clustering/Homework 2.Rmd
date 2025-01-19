@@ -1,0 +1,286 @@
+---
+title: "Homework 2"
+output: html_document
+---
+
+# Question 3.1
+Using the same data set (credit_card_data.txt or credit_card_data-headers.txt) as
+in Question 2.2, use the ksvm or kknn function to find a good classifier:
+
+## 3.1.a using cross-validation (do this for the k-nearest-neighbors model; SVM is optional)
+
+We import the relevant packages and read the credit card dataset into a dataframe
+```{r message = FALSE}
+# Importing packages
+library(kernlab)
+library(caret)
+library(kknn)
+
+# Read credit card data into df
+directory <- "C:/Users/Clayton/Documents/Gatech/ISYE 6501 Intro to Analytics Modelling/Module 2 Classification/"
+df <- read.table(paste0(directory, "credit_card_data-headers.txt"), header = T, sep = "\t")
+```
+
+Set seed for reproducible results
+```{r message = FALSE}
+set.seed(31)
+```
+
+Since we are doing a k-fold cross validation, we will simply split the data to a training set (80%) and a test set (20%), where the training set will be used for cross validation and the test set will be used to validate the predictions from the model
+```{r message = FALSE}
+# create train-test split (80-20)
+df_len <- dim(df)[1]
+test_sample <- sample(1:df_len, size=round(0.2*df_len), replace=FALSE)
+train_set <- df[-test_sample,]
+test_set <- df[test_sample,]
+```
+
+### K-nearest-neighbours model
+First, we will train the k-nearest-neighbours model using the training set. Setting the conditions of the cross-validation, the training control method is a 10-fold cross validation, with a hyperparameter tuning grid for kknn model for distance (in range 1 to 5), kmax (value of 20), and kernels (value of optimal).
+```{r message = FALSE}
+# define training control for cross validation
+train_control <- trainControl(method = "cv", number = 10)
+
+# define Hyperparameter Grid
+tune_grid <- expand.grid(distance=c(1:5), kmax=20, kernel="optimal")
+```
+
+We then train the model with cross-validation to identify the best performing hyperparameters from the tuning grid. In this case, the best hyperparameters are: 
+
+- kmax = 20
+- k = 13
+- distance = 1
+- kernel = 'optimal'
+```{r message = FALSE}
+# train the kknn classification model with cross validation
+model <- train(as.factor(R1)~., data=train_set, trControl=train_control, tuneGrid=tune_grid, method="kknn")
+```
+```{r echo = FALSE}
+cat("Best value of k:", model$finalModel$best.parameters$k)
+cat("Best tuned distance hyperparameter:", model$bestTune$distance)
+```
+
+Finally, we train the model again with the best hyperparameters and value of k to derive our model for predictions. With this model, we achieved an accuracy score of `84.73%`
+```{r}
+# using the best parameters from the training step, build the kknn model
+kknn_model <- kknn(as.factor(R1)~., train=train_set, test=test_set, scale=T, k=13, distance=1, kernel='optimal')
+
+# fit the model and observe the model performance
+kknn_fit <- fitted(kknn_model)
+confusionMatrix(data=kknn_fit, reference=as.factor(test_set$R1))
+```
+
+### KSVM model
+Similarly, we will do the cross-validation on the training set using a 10-fold cross-validation.
+```{r message = FALSE}
+# create folds for k-fold cross validation
+folds = createFolds(as.factor(train_set[, 11]), k = 10)
+```
+
+After which, we will optimise for the best value of C for the Support Vector Model by assessing the 10-fold cross-validation model performance. Through this optimisation, we found the best value of C to be `0.005`, achieving an accuracy of `85.27%`.
+```{r include = FALSE}
+# Optimise for C parameter
+C_list <- list("0.001", "0.005", "0.01", "0.05", "0.1", "0.5", "1", "5", "10", "50", "100", "1000")
+best_c <- 0
+best_accuracy <- 0
+
+for (c in C_list) {
+  model = lapply(folds, function(x) {
+    train_fold = train_set[-x, ]
+    test_fold = train_set[x, ]
+    
+    ksvm = ksvm(as.matrix(train_fold[, 1:10]), as.factor(train_fold[, 11]), type="C-svc", kernel="vanilladot", C=c, scaled=TRUE)
+    
+    y_pred <- predict(ksvm, test_fold[, 1:10])
+    # accuracy <- sum(y_pred == test_fold[, 11]) / nrow(test_fold)
+    
+    cm = table(test_fold[, 11], y_pred)
+    accuracy = (cm[1,1] + cm[2,2]) / (cm[1,1] + cm[2,2] + cm[1,2] + cm[2,1])
+    return(accuracy)
+  })
+  cv_accuracy <- mean(unlist(model))
+  if (cv_accuracy > best_accuracy) {
+    best_c <- c
+    best_accuracy <- cv_accuracy
+  }
+}
+```
+```{r echo = FALSE}
+cat("The best performing value of C is:", best_c, "\n")
+cat("The accuracy with the best value of C is:", best_accuracy*100, "%")
+```
+
+With the optimised value of C, we now train the model for validation against the test set. With this model, we achieved an accuracy score of `90.84%`. 
+```{r include = FALSE}
+ksvm_model <- ksvm(as.matrix(train_set[, 1:10]), as.factor(train_set[, 11]), type="C-svc", kernel="vanilladot", C=best_c, scaled=TRUE)
+
+# fit the model and observe the model performance
+ksvm_pred <- predict(ksvm_model, test_set[, 1:10])
+```
+```{r echo = FALSE}
+confusionMatrix(data=ksvm_pred, reference=as.factor(test_set$R1))
+```
+
+## 3.1.b splitting the data into training, validation, and test data sets (pick either KNN or SVM; the other is optional).
+
+In this question, we will split the data into training (70%), validation (15%), and test (15%) sets. This is to ensure the majority of data points are allocated for training.
+```{r message = FALSE}
+# create train-validation-test split (70-15-15)
+set.seed(31)
+
+df_len <- dim(df)[1]
+test_sample <- sample(1:df_len, size=round(3/20*df_len), replace=FALSE)
+train_validation_set <- df[-test_sample,]
+test_set <- df[test_sample,]
+
+train_validation_df_len <- dim(train_validation_set)[1]
+validation_sample <- sample(1:train_validation_df_len, size=round(3/17*train_validation_df_len), replace=FALSE)
+train_set <- df[-validation_sample,]
+validation_set <- df[validation_sample,]
+```
+
+### KNN model
+Similar to 3.1.a, we first train the model to find the best value of k. With this train step, we find the best value of k to be `16` which achieved an accuracy score of `85.97%`.
+```{r message = FALSE}
+# train the kknn model to find the best value of k
+kknn_model <- train.kknn(as.factor(R1)~., data=train_set, scale=T, kmax=50)
+best_k <- kknn_model[['best.parameters']][[2]]
+best_accuracy <- 1 - min(kknn_model[['MISCLASS']])
+```
+```{r echo = FALSE}
+cat("The best performing value of k is:", best_k, "\n")
+cat("The accuracy with the best value of k is:", best_accuracy*100, "%")
+```
+
+With this model, we achieved an accuracy score of `76.53%` on the validation set.
+```{r message = FALSE}
+# fit the model and observe the model performance
+y_pred <- predict(kknn_model, validation_set[, 1:10])
+```
+```{r echo = FALSE}
+confusionMatrix(data=y_pred, reference=as.factor(validation_set$R1))
+```
+
+## KSVM model
+For the KSVM model, we first optimise for the value of C. In this step, we find the value of C to be `0.005` which achieved an accuracy score of `86.87%`.
+```{r include = FALSE}
+# Optimise for C parameter
+C_list <- list("0.001", "0.005", "0.01", "0.05", "0.1", "0.5", "1", "5", "10", "50", "100", "1000")
+best_c <- 0
+best_accuracy <- 0
+
+# train the ksvm model to find the best value of C
+for (c in C_list) {
+  ksvm_training_model <- ksvm(as.matrix(train_set[, 1:10]), as.factor(train_set[, 11]), type="C-svc", kernel="vanilladot", C=c, scaled=TRUE)
+    
+  y_pred <- predict(ksvm_training_model, train_set[, 1:10])
+  accuracy <- sum(y_pred == train_set[, 11]) / nrow(train_set)
+
+  if (accuracy > best_accuracy) {
+    best_c <- c
+    best_accuracy <- accuracy
+  }
+}
+```
+```{r echo = FALSE}
+cat("The best performing value of C is:", best_c)
+cat("The accuracy with the best value of C is:", best_accuracy*100, "%")
+```
+
+Using the best value of C from the previous step, we build the KSVM model for predictions on the validation set. This model achieved an accuracy score of `83.67%` on the validation set.
+```{r include = FALSE}
+# using the best value of C from the training step, build the ksvm model
+ksvm_model <- ksvm(as.matrix(train_set[, 1:10]), as.factor(train_set[, 11]), type="C-svc", kernel="vanilladot", C=best_c, scaled=TRUE)
+
+# fit the model and observe the model performance
+ksvm_pred <- predict(ksvm_model, validation_set[, 1:10])
+```
+```{r echo = FALSE}
+confusionMatrix(data=ksvm_pred, reference=as.factor(validation_set$R1))
+```
+
+### Chosen model - KSVM Model
+
+Since the KSVM model performed better on the validation set, we will evaluate the test set using KSVM. Comparing the model performance on the validation vs test set, the accuracy scores are fairly similar to each other; therefore, we can be fairly confident that we can observe a similar accuracy result when using the model on a new dataset.
+```{r message = FALSE}
+ksvm_pred <- predict(ksvm_model, test_set[, 1:10])
+
+```
+```{r echo = FALSE}
+confusionMatrix(data=ksvm_pred, reference=as.factor(test_set$R1))
+```
+
+# Question 4.1
+Describe a situation or problem from your job, everyday life, current events, etc., for which a clustering
+model would be appropriate. List some (up to 5) predictors that you might use.
+
+**A:** In my job in the food delivery industry, we have restaurant accounts on our platform to provide food options to our customers. 
+One use case of clustering for these restaurant vendors is to cluster them based on their performance on our platform so that 
+we can target them more effectively with benefits to encourage their good performance or recommendations to improve their performance.
+
+Some predictors we can use are:
+
+- Number of years the vendor is on our platform
+- Amount of Gross Merchandise Value contributed by the vendor in the past 3 months
+- Number of orders by the vendor in the past 3 months
+- Conversion rate (# orders / # clicks) of the vendor in the past 3 months
+- Average customer rating of the vendor in the past 3 months
+
+
+# Question 4.2
+The iris data set iris.txt contains 150 data points, each with four predictor variables and one
+categorical response. The predictors are the width and length of the sepal and petal of flowers and the
+response is the type of flower. The data is available from the R library datasets and can be accessed with
+iris once the library is loaded. It is also available at the UCI Machine Learning Repository
+(https://archive.ics.uci.edu/ml/datasets/Iris ). The response values are only given to see how well a
+specific method performed and should not be used to build the model.
+Use the R function kmeans to cluster the points as well as possible. Report the best combination of
+predictors, your suggested value of k, and how well your best clustering predicts flower type.
+
+First, we import the relevant libraries for this question.
+```{r message = FALSE}
+library(datasets)
+library(cluster)
+library(factoextra)
+```
+
+Next, we set a seed for the session for reproducibility.
+```{r message = FALSE}
+set.seed(31)
+```
+
+Observing the iris dataset, we see that there are 3 categories for the target variable `Species`. This indicates that we should expect to train our k-means model for 3 clusters.
+```{r echo = FALSE}
+data(iris)
+summary(iris)
+```
+
+Despite identifying the 3 possible categories of Species, we can still plot an elbow plot to observe the likely number of optimal clusters for this dataset. From the plot, we see that the 'elbow' is at where `k = 3`, therefore, our chosen value of k is `3`.
+```{r echo = FALSE}
+fviz_nbclust(as.matrix(iris[, 4]), kmeans, method = "wss")
+```
+
+We can now train the model to identify 3 clusters by specifying the number of cluster centers. We are also doing a sort on the cluster centers to ensure reproducibility of the cluster numbers for each cluster. 
+
+From the different permutations of predictors, we find that using all 4 predictors for the model maximises the model performance when comparing predictions against its true values. Hence, we will include all 4 predictors in this model.
+```{r message = FALSE}
+cluster_model <- kmeans(as.matrix(iris[, 4]), centers=3)
+centers <- sort(cluster_model$centers)
+cluster_model <- kmeans(as.matrix(iris[, 4]), centers=centers)
+```
+
+We can also plot the data points on a chart to observe how each point is clustered.
+```{r echo = FALSE}
+plot(as.matrix(iris[, 4]), col = cluster_model$cluster)
+```
+
+Due to the nature of the model assigning clusters to numbers, we are now renaming clusters to the respective species category.
+```{r message = FALSE}
+y_pred <- factor(cluster_model$cluster)
+levels(y_pred) <- c("setosa","versicolor","virginica")
+```
+
+By comparing the clustering results to the actual species category in the dataset, we can calculate the accuracy of this model in clustering each flower; this model has achieved an accuracy score of `96%`.
+```{r echo = FALSE}
+confusionMatrix(data=y_pred, reference=as.factor(iris$Species))
+```

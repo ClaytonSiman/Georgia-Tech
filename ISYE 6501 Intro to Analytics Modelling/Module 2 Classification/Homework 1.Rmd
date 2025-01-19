@@ -45,14 +45,14 @@ The accuracy of the model is: `86.4%`
 
 *However, since the model is trained on the entire dataset, it does not necessarily mean that we already have a good model. This model may not perform well against new data and we may have an overfitted model such that it achieves a high accuracy rate on trained data but not on new, unseen data.*
 
-```r
+```{r message = FALSE}
 # Installing & importing packages
 library(kernlab)
 ```
 
-```r
+```{r message = FALSE}
 # Read credit card data into df
-directory <- "/path/to/file/"
+directory <- "C:/Users/Clayton/Documents/Gatech/ISYE 6501 Intro to Analytics Modelling/Module 2 Classification/"
 df <- read.table(paste0(directory, "credit_card_data-headers.txt"), header = T, sep = "\t")
 ```
 
@@ -230,18 +230,18 @@ Prediction 1 - Actual 1 (True Positive) : 46
 Sensitivity : `95.71%`          
 Specificity : `75.41%`
 
-```r
+```{r message = FALSE}
 # Installing & importing packages
 library(kknn)
 library(caret)
 ```
 
-```r
+```{r message = FALSE}
 # Set seed for reproducibility
 set.seed(31)
 ```
 
-```r
+```{r message = FALSE}
 # Create train-test split
 df_len <- dim(df)[1]
 test_sample <- sample(1:df_len, size=round(0.2*df_len), replace=FALSE)
@@ -249,7 +249,7 @@ train_set <- df[-test_sample,]
 test_set <- df[test_sample,]
 ```
 
-```r
+```{r message = FALSE}
 # Train the KNN classifier and find the best value of k
 best_i <- 0
 best_accuracy <- 0
@@ -274,6 +274,6 @@ Best value of k is: `44`
 
 Using the best value of k, the accuracy is: `86.25954 %`
 
-```r
+```{r echo = FALSE}
 confusionMatrix(data=fit, reference=as.factor(test_set$R1))
 ```

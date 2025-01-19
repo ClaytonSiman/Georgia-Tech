@@ -413,7 +413,7 @@ on new, unseen data.</em></p>
 <pre class="r"><code># Installing &amp; importing packages
 library(kernlab)</code></pre>
 <pre class="r"><code># Read credit card data into df
-directory &lt;- &quot;/path/to/file/&quot;
+directory &lt;- &quot;C:/Users/Clayton/Documents/Gatech/ISYE 6501 Intro to Analytics Modelling/Module 2 Classification/&quot;
 df &lt;- read.table(paste0(directory, &quot;credit_card_data-headers.txt&quot;), header = T, sep = &quot;\t&quot;)</code></pre>
 <pre class="r"><code># Set seed for reproducibility
 set.seed(31)</code></pre>
@@ -608,13 +608,41 @@ for (i in 1:100) {
   }
 }
 
-cat(&quot;Best value of k is:&quot;, best_i, &quot;\n&quot;)
-cat(&quot;Using the best value of k, the accuracy is:&quot;, best_accuracy*100, &quot;%&quot;)</code></pre>
+cat(&quot;Best value of k is:&quot;, best_i, &quot;\n&quot;)</code></pre>
+<pre><code>## Best value of k is: 44</code></pre>
+<pre class="r"><code>cat(&quot;Using the best value of k, the accuracy is:&quot;, best_accuracy*100, &quot;%&quot;)</code></pre>
+<pre><code>## Using the best value of k, the accuracy is: 86.25954 %</code></pre>
 <p><strong>Output:</strong></p>
 <p>Best value of k is: <code>44</code></p>
 <p>Using the best value of k, the accuracy is:
 <code>86.25954 %</code></p>
-<pre class="r"><code>confusionMatrix(data=fit, reference=as.factor(test_set$R1))</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction  0  1
+##          0 67 15
+##          1  3 46
+##                                           
+##                Accuracy : 0.8626          
+##                  95% CI : (0.7916, 0.9165)
+##     No Information Rate : 0.5344          
+##     P-Value [Acc &gt; NIR] : 1.343e-15       
+##                                           
+##                   Kappa : 0.7204          
+##                                           
+##  Mcnemar&#39;s Test P-Value : 0.009522        
+##                                           
+##             Sensitivity : 0.9571          
+##             Specificity : 0.7541          
+##          Pos Pred Value : 0.8171          
+##          Neg Pred Value : 0.9388          
+##              Prevalence : 0.5344          
+##          Detection Rate : 0.5115          
+##    Detection Prevalence : 0.6260          
+##       Balanced Accuracy : 0.8556          
+##                                           
+##        &#39;Positive&#39; Class : 0               
+## </code></pre>
 </div>
 
 
