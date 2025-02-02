@@ -1,0 +1,98 @@
+---
+title: "Homework 4"
+output: html_document
+---
+
+## Question 7.1
+Describe a situation or problem from your job, everyday life, current events, etc., for which exponential smoothing would be appropriate. What data would you need? Would you expect the value of (the first smoothing parameter) to be closer to 0 or 1, and why?
+
+**A:** In my job in the food delivery industry, exponential smoothing can be useful when identifying periods of increased demand for food so that we can allocate delivery manpower appropriately. At the same time, we do not want to overreact to random spikes in demand so exponential smoothing can be helpful to smooth out this demand curve. 
+
+We would probably need datetime data to identify the date, day of the week, and time of the day, as well as the number of orders made for each time period to measure the food demand. For example, we can look at hourly data for orders to measure the demand for food at each hour, and run exponential smoothing to measure the smoothened hourly demand curve.
+
+The value of alpha (first smoothing parameter) would likely be closer to 1 as hourly food demand is unlikely to be wildly fluctuating and we would want the model to be reactive enough to detect large increases in food demand quickly. This way, we can quickly identify peak demand periods and allocate manpower accordingly.
+
+
+## Question 7.2
+Using the 20 years of daily high temperature data for Atlanta (July through October) from Question 6.2 (file temps.txt), build and use an exponential smoothing model to help make a judgment of whether the unofficial end of summer has gotten later over the 20 years.  (Part of the point of this assignment is for you to think about how you might use exponential smoothing to answer this question. Feel free to combine it with other models if you’d like to. There’s certainly more than one reasonable approach.) 
+
+Note: in R, you can use either HoltWinters (simpler to use) or the smooth package’s es function (harder to use, but more general).  If you use es, the Holt-Winters model uses model=”AAM” in the function call (the first and second constants are used “A”dditively, and the third (seasonality) is used “M”ultiplicatively; the documentation doesn’t make that clear). 
+
+**A:** 
+
+**General approach:**
+
+- Use triple exponential smoothing model to estimate for beta (trend) and gamma (seasonality), the beta estimate measures whether the annual temperatures have trended up or down over the years
+- Use CUSUM method on the average annual seasonality factors to identify whether seasonality factors has increased in the later years, which would indicate that unofficial end of summer has gotten later
+- From the findings, we see that beta estimate is 0, which indicates that the annual temperature trend has remained flat, and the CUSUM on average annual seasonality factors have largely remained the same, indicating that the seasonality factors have also remained the same over the years
+- Therefore, we can conclude that unofficial end of summer has not gotten later over the past 20 years
+
+Perform initialisation:
+``` {r message = FALSE}
+# Load required libraries
+library(qcc)
+
+# Set seed for reproducibility
+set.seed(31)
+```
+
+First, we read the data into a dataframe, convert the dataframe into a vector, then finally to a time-series object for the HoltWinters model
+``` {r}
+# Read data into df
+df <- read.table("C:/Users/Clayton/Documents/Gatech/ISYE 6501 Intro to Analytics Modelling/Module 7 Time Series Models/Homework 4/temps.txt", header = TRUE)
+
+# Convert dataframe into a vector  
+df_vector <- as.vector(unlist(df[, 2:21]))
+
+# Convert vector to time-series object for the HoltWinters model
+df_length <- length(df[, 1])
+temp_ts <- ts(df_vector, start=1996, frequency=df_length)
+```
+
+Plot the time-series data for visualisation
+``` {r}
+plot(temp_ts)
+```
+
+From the chart, the trend of the temperature data seem to be rather flat visually. We can verify this using the exponential smoothing model.
+
+To analyse whether the unofficial end of summer has gotten later over the years, we are generally interested in 2 factors: the beta (or trend) estimate and the gamma (or seasonality) estimate.
+Therefore, we will be using the Triple Exponential Smoothing approach to determine the trend and seasonality estimates.
+For the Seasonality estimate, we will use the 'Additive' approach as we will generally expect temperature differences between summer and fall for each year to be roughly consistent.
+
+``` {r}
+es_triple_additive_model <- HoltWinters(temp_ts, seasonal='additive')
+```
+
+``` {r}
+es_triple_additive_model$beta
+es_triple_additive_model$coefficients[2]
+```
+
+Here we see that beta (or trend estimate) and beta coefficient is 0 or near 0, which means that across the past 20 years, the trend of temperatures from July to October has remained flat.
+However, this is not sufficient to conclude that the unofficial end of summer over the past 20 years has remained the same.
+For this, we will need to observe the seasonality factors to determine whether unofficial end of summer has gotten later.
+
+The intuition here is that if unofficial end of summer has gotten later, we will expect the average annual seasonality factor to increase over the years, since we expect more days of summer between July and October in the later years.
+We will use the CUSUM approach on the average annual seasonality factor to determine whether the annual seasonality factor has consistently increased above 5 standard errors in the later years.
+
+``` {r}
+# Extract the seasonality factors from the Triple Exponential Smoothing model to a matrix
+season_matrix <- matrix(es_triple_additive_model$fitted[, 4], ncol=df_length)
+
+# Get the average annual seasonality factors for all years
+avg_seasonality <- data.frame(rowMeans(season_matrix, n=19))
+```
+
+For the CUSUM method, we will use the mean annual seasonality factor as the center (C) and the threshold (T) to be a standard 5x of the standard error.
+```{r}
+# Get the mean annual seasonality factor for all years for CUSUM center (C)
+mean_seasonality <- mean(avg_seasonality[, 1])
+
+# Use the mean annual seasonality factor as the center (C) and the threshold (T) to be a standard 5x of the standard error
+seasonality_cusum <- cusum(avg_seasonality, center=mean_seasonality, decision.interval=5)
+```
+
+From the CUSUM chart, we see that the average annual seasonality factor for most of the remaining 19 years has remained within 5 standard errors.
+The only exception is in the year 2010, when the seasonality factor increased above 5 standard errors; however, from the chart, this is a one-off observation and the seasonality factor subsequently reverted to the mean afterwards.
+Therefore, we can conclude that the **seasonality factors across the years have largely remained the same** and **unofficial end of summer has not gotten later in the past 20 years**.
