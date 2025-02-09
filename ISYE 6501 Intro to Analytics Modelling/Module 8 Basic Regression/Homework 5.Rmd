@@ -18,104 +18,133 @@ Some predictors that can be used:
 
 
 ## Question 8.2
-Using crime data from http://www.statsci.org/data/general/uscrime.txt (file uscrime.txt, description at
-http://www.statsci.org/data/general/uscrime.html ), use regression (a useful R function is lm or glm) to
-predict the observed crime rate in a city with the following data:
-M = 14.0
-So = 0
-Ed = 10.0
-Po1 = 12.0
-Po2 = 15.5
-LF = 0.640
-M.F = 94.0
-Pop = 150
-NW = 1.1
-U1 = 0.120
-U2 = 3.6
-Wealth = 3200
-Ineq = 20.1
-Prob = 0.04
+Using crime data from http://www.statsci.org/data/general/uscrime.txt (file uscrime.txt, description at http://www.statsci.org/data/general/uscrime.html ), use regression (a useful R function is lm or glm) to predict the observed crime rate in a city with the following data:
+
+M = 14.0,
+So = 0,
+Ed = 10.0,
+Po1 = 12.0,
+Po2 = 15.5,
+LF = 0.640,
+M.F = 94.0,
+Pop = 150,
+NW = 1.1,
+U1 = 0.120,
+U2 = 3.6,
+Wealth = 3200,
+Ineq = 20.1,
+Prob = 0.04,
 Time = 39.0
+
 Show your model (factors used and their coefficients), the software output, and the quality of fit.
-Note that because there are only 47 data points and 15 predictors, you’ll probably notice some
-overfitting. We’ll see ways of dealing with this sort of problem later in the course.
+Note that because there are only 47 data points and 15 predictors, you’ll probably notice some overfitting. We’ll see ways of dealing with this sort of problem later in the course.
 
 
 **A:** 
 
 **General approach:**
 
-- Use triple exponential smoothing model to estimate for beta (trend) and gamma (seasonality), the beta estimate measures whether the annual temperatures have trended up or down over the years
-- Use CUSUM method on the average annual seasonality factors to identify whether seasonality factors has increased in the later years, which would indicate that unofficial end of summer has gotten later
-- From the findings, we see that beta estimate is 0, which indicates that the annual temperature trend has remained flat, and the CUSUM on average annual seasonality factors have largely remained the same, indicating that the seasonality factors have also remained the same over the years
-- Therefore, we can conclude that unofficial end of summer has not gotten later over the past 20 years
+- Scale the independent variables to ensure that all variables contribute equally to the linear regression model
+- Since the dataset is rather small with only 47 observations, we will use a leave-one-out-cross-validation (LOOCV) method for the cross validation step
+- With the trained model, we use the data points given in the question to predict the amount of crime in the city
+- However, the model can be improved further as we see that some variables are not statistically significant at a 95% level in contributing to the model. Therefore, we can train the model again with only the statistically significant variables
+- With this new model, we use the data points given in the question again to predict the amount of crime in the city, which gives a more appropriate estimate
 
 Perform initialisation:
 ``` {r message = FALSE}
 # Load required libraries
-library(qcc)
+library(caret)
+library(boot)
+library(Hmisc)
 
 # Set seed for reproducibility
 set.seed(31)
 ```
 
-First, we read the data into a dataframe, convert the dataframe into a vector, then finally to a time-series object for the HoltWinters model
+First, we read the data into a dataframe and observe the general statistics of the dataset given.
 ``` {r}
-# Read data into df
-df <- read.table("C:/Users/Clayton/Documents/Gatech/ISYE 6501 Intro to Analytics Modelling/Module 7 Time Series Models/Homework 4/temps.txt", header = TRUE)
+# Read data into a dataframe
+df <- read.table("C:/Users/Clayton/Documents/Gatech/ISYE 6501 Intro to Analytics Modelling/Module 6 Change Detection/Homework 3/uscrime.txt", header = TRUE)
 
-# Convert dataframe into a vector  
-df_vector <- as.vector(unlist(df[, 2:21]))
-
-# Convert vector to time-series object for the HoltWinters model
-df_length <- length(df[, 1])
-temp_ts <- ts(df_vector, start=1996, frequency=df_length)
+describe(df)
 ```
 
-Plot the time-series data for visualisation
+Since we are using a linear regression model which can be sensitive to differing magnitudes of independent variables, we will need to scale the independent variables to ensure that each variable contributes to the model equally.
 ``` {r}
-plot(temp_ts)
+# Scale only the independent variables (columns 1-14)
+df_scaled_features <- scale(df[1:(length(df)-1)])
+
+# Combine the scaled independent variables and the unscaled dependent variable 
+df_scaled <- merge(df_scaled_features, df[length(df)], by='row.names', all.x=TRUE)
+df_scaled <- df_scaled[2:length(df_scaled)]
 ```
 
-From the chart, the trend of the temperature data seem to be rather flat visually. We can verify this using the exponential smoothing model.
-
-To analyse whether the unofficial end of summer has gotten later over the years, we are generally interested in 2 factors: the beta (or trend) estimate and the gamma (or seasonality) estimate.
-Therefore, we will be using the Triple Exponential Smoothing approach to determine the trend and seasonality estimates.
-For the Seasonality estimate, we will use the 'Additive' approach as we will generally expect temperature differences between summer and fall for each year to be roughly consistent.
+After scaling the features, we then perform an LOOCV method for cross validation since we have a small dataset of only 47 observations. This method ensures that we still have a large enough number of observations for model training before performing the validation. 
 
 ``` {r}
-es_triple_additive_model <- HoltWinters(temp_ts, seasonal='additive')
+# Specify the cross-validation method
+ctrl <- trainControl(method="LOOCV")
+
+# Fit the linear regression model and use LOOCV to evaluate performance
+model <- train(Crime ~ ., data=df_scaled, method="lm", trControl=ctrl)
 ```
+
+This model has an RMSE of about `274` and a Multiple R-squared score of about `80%`. The factors and coefficients of the model are as shown below.
+
+Here we observe that the Adjusted R-squared score (`~71%`) is lower than the Multiple R-squared score, which indicates that we may have included more predictors than necessary in this model. Therefore, we can retrain the model using only the statistically significant variables to ensure we do not include unnecessary variables.
 
 ``` {r}
-es_triple_additive_model$beta
-es_triple_additive_model$coefficients[2]
+summary(model)
+model$results$RMSE
 ```
 
-Here we see that beta (or trend estimate) and beta coefficient is 0 or near 0, which means that across the past 20 years, the trend of temperatures from July to October has remained flat.
-However, this is not sufficient to conclude that the unofficial end of summer over the past 20 years has remained the same.
-For this, we will need to observe the seasonality factors to determine whether unofficial end of summer has gotten later.
+Using this current model, we can predict the amount of crime using the datapoints given in the question. Since we have scaled the independent variables for training, we will then need to scale this test datapoint using the scaling attributes of the training data before running the predictions.
 
-The intuition here is that if unofficial end of summer has gotten later, we will expect the average annual seasonality factor to increase over the years, since we expect more days of summer between July and October in the later years.
-We will use the CUSUM approach on the average annual seasonality factor to determine whether the annual seasonality factor has consistently increased above 5 standard errors in the later years.
+From the prediction, we see that the predicted number of crime is about `155`, which is far lower than the smallest number of crime `342` in our training set. This could mean that the current model is not appropriate enough to predict this test datapoint and the prediction is based on extrapolating results from the linear regression model.
 
 ``` {r}
-# Extract the seasonality factors from the Triple Exponential Smoothing model to a matrix
-season_matrix <- matrix(es_triple_additive_model$fitted[, 4], ncol=df_length)
+# Test data from the question
+test_data = data.frame(
+  M = 14.0,
+  So = 0,
+  Ed = 10.0,
+  Po1 = 12.0,
+  Po2 = 15.5,
+  LF = 0.640,
+  M.F = 94.0,
+  Pop = 150,
+  NW = 1.1,
+  U1 = 0.120,
+  U2 = 3.6,
+  Wealth = 3200,
+  Ineq = 20.1,
+  Prob = 0.04,
+  Time = 39.0
+)
 
-# Get the average annual seasonality factors for all years
-avg_seasonality <- data.frame(rowMeans(season_matrix, n=19))
+# Scale the test data using scaling attributes from training
+test_scaled <- scale(test_data, center=attr(df_scaled_features, "scaled:center"), scale=attr(df_scaled_features, "scaled:scale"))
+
+# Run the prediction
+predict(model, newdata=test_scaled)
 ```
 
-For the CUSUM method, we will use the mean annual seasonality factor as the center (C) and the threshold (T) to be a standard 5x of the standard error.
+With this, we can build a better model using only the statistically significant independent variables for training. From our previous results, we use only variables that are statistically significant at a 95% level (M, Ed, Po1, U2, Ineq, Prob).
+
 ```{r}
-# Get the mean annual seasonality factor for all years for CUSUM center (C)
-mean_seasonality <- mean(avg_seasonality[, 1])
-
-# Use the mean annual seasonality factor as the center (C) and the threshold (T) to be a standard 5x of the standard error
-seasonality_cusum <- cusum(avg_seasonality, center=mean_seasonality, decision.interval=5)
+# Train the model using only statistically significant variables
+new_model <- train(Crime ~ M + Ed + Po1 + U2 + Ineq + Prob, data=df_scaled, method="lm", trControl=ctrl)
 ```
 
-From the CUSUM chart, we see that the average annual seasonality factor for most of the remaining 19 years has remained within 5 standard errors.
-The only exception is in the year 2010, when the seasonality factor increased above 5 standard errors; however, from the chart, this is a one-off observation and the seasonality factor subsequently reverted to the mean afterwards.
-Therefore, we can conclude that the **seasonality factors across the years have largely remained the same** and **unofficial end of summer has not gotten later in the past 20 years**.
+With this new model, we see that both RMSE and Adjusted R-squared score have improved from `274 -> 221` and `71% -> 73%` respectively. We can also observe that the difference between the Multiple R-squared score and the Adjusted R-squared score has reduced from `80% vs 71%` in the previous model to `77% vs 73%` in this new model, which can indicate that the number of predictors used in this model is more appropriate.
+
+```{r}
+summary(new_model)
+new_model$results$RMSE
+```
+
+With the new model, the predicted number of crime is about `1,304`, which is within the range of the number of crime in the training set (`342 - 1,993`). Therefore, the prediction seems to be more appropriate with the new model.
+```{r}
+# Run the prediction using the new model, the model automatically picks out only the relevant variables for prediction
+predict(new_model, newdata=test_scaled)
+```
