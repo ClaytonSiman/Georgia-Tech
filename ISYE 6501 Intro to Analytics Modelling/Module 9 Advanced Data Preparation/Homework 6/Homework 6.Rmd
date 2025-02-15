@@ -1,0 +1,152 @@
+---
+title: "Homework 6"
+output: html_document
+---
+
+## Question 9.1
+Using the same crime data set uscrime.txt as in Question 8.2, apply Principal Component Analysis and then create a regression model using the first few principal components.  Specify your new model in terms of the original variables (not the principal components), and compare its quality to that of your solution to Question 8.2.  You can use the R function prcomp for PCA. (Note that to first scale the data, you can include scale. = TRUE to scale as part of the PCA function. Don’t forget that, to make a prediction for the new city, you’ll need to unscale the coefficients (i.e., do the scaling calculation in reverse)!)
+
+**A:** 
+
+**General approach:**
+
+- Get the 15 independent variables of the data and use PCA with scaling to get the 15 principal components
+- Using the scree plot from the principal components variance data, find the top components to use for the model based on the change in proportion of variance explained by each component; in this case, the top 5 components are chosen because the dip in variance explained from component 5 to component 6 is rather steep
+- Using these top 5 components + the response variable (Crime), train the linear regression model using a Leave-One-Out cross validation (LOOCV) approach (because the data set is rather small with only 47 observations, the LOOCV approach is used to ensure that we still have sufficient data for model training for each CV fold)
+- Using the model coefficients, PCA transformation rotation, and the independent variables' mean & standard deviation, we can derive the linear regression equation based on the original independent variables
+- With the test data point given, we can use the PCA transformation to derive the top 5 principal components of the test data point and subsequently, predict the amount of crime for the test data point using the trained model
+
+Perform initialisation:
+``` {r message = FALSE}
+# Load required libraries
+library(caret)
+library(Hmisc)
+library(stats)
+library(ggplot2)
+
+# Set seed for reproducibility
+set.seed(31)
+```
+
+First, we read the data into a dataframe and observe the general statistics of the dataset given. Observe that the range of Crime column is between 342 and 1993, so we should expect our prediction on the test data to be within this range.
+``` {r}
+# Read data into a dataframe
+df <- read.table("C:/Users/Clayton/Documents/Gatech/ISYE 6501 Intro to Analytics Modelling/Module 6 Change Detection/Homework 3/uscrime.txt", header = TRUE)
+
+describe(df)
+```
+
+For the PCA transformation, we will only be using the 15 independent variables. 
+``` {r}
+# Get only the 15 independent variables
+df_x <- df[1:15]
+
+# PCA of the independent variables with scaling
+pca_result <- prcomp(df_x, scale.=TRUE)
+summary(pca_result)
+```
+
+Now we analyse the variance of each principal component to decide how many top components we will use for model training. From the scree plot, we see that the difference in proportion of variance explained is rather steep between component 5 and component 6, therefore, to maximise the proportion of variance explained in our model, we will only use the top 5 components.
+``` {r}
+# Analysing variance of each component
+scree_data <- data.frame(
+  Component = 1:length(pca_result$sdev),
+  Variance = pca_result$sdev^2 / sum(pca_result$sdev^2)
+)
+
+# Plot the scree plot
+ggplot(scree_data, aes(x = Component, y = Variance)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  geom_line() +
+  geom_point() +
+  xlab("Principal Components") +
+  ylab("Proportion of Variance Explained") +
+  ggtitle("Scree Plot")
+```
+
+With the top 5 components, we merge the component columns with the response variable.
+``` {r}
+# Combine top 5 PCA components with dependent variable
+pca_df <- merge(pca_result$x[, 1:5], df[16], by='row.names', all.x=TRUE)
+pca_df <- pca_df[2:length(pca_df)]
+``` 
+
+With the new component dataframe, we now train the linear regression model with the Leave-One-Out cross validation (LOOCV). This ensures that the model is trained with sufficient training data for each cross validation fold. Here we see that most of the components are statistically significant variables at a 99% level.
+``` {r}
+# Specify the cross-validation method
+ctrl <- trainControl(method="LOOCV")
+
+# Fit a regression model and use LOOCV to evaluate performance
+model <- train(Crime ~ ., data=pca_df, method="lm", trControl=ctrl)
+summary(model)
+```
+
+We can derive the model equation to better understand how each original independent variable contributes to the prediction of crime in this new linear regression model using principal components. To get the model equation we will need to derive the model intercept and coefficients for each original independent variable. The approach is outlined below:
+``` {r}
+# Get model equation based on original variables
+## Get the rotation matrix from the PCA transformation of the top 5 components
+rotation <- pca_result$rotation[, 1:5]
+
+## Get the beta vector from the linear regression model coefficients of the top 5 components
+beta <- model$finalModel$coefficients[2:6] 
+
+## Derive alpha through the multiplication of the rotation matrix & beta vector
+alpha <- rotation %*% beta
+
+## Get the mean & standard deviation of the original 15 independent variables to reverse the scaling from PCA
+mu <- sapply(df_x, mean)
+sigma <- sapply(df_x, sd)
+
+## Derive the model intercept & coefficients for the 15 original independent variables 
+orig_intercept <- model$finalModel$coefficients[1] - sum(alpha*mu / sigma)
+orig_coeff <- alpha / sigma
+```
+```{r, echo=FALSE}
+orig_intercept
+orig_coeff
+```
+
+With the above, we now have the model equation based on the 15 original independent variables: 
+
+`Crime = -5934 + 48.37374*M + 79.01922*So + 17.8312*Ed + 39.48484*Po1 + 39.85892*Po2 + 1886.946*LF + 36.69366*M.F + 1.546583*Pop + 9.537384*NW + 159.0115*U1 + 38.29933*U2 + 0.03724014*Wealth + 5.540321*Ineq + -1523.521*Prob + 3.838779*Time`
+
+Now we can predict the level of crime for the new data point. For this, we can do it 2 ways: predict using the model equation we derived above or predict using the PCA transformation & model prediction of the test data point. 
+
+First method, for the prediction with the model equation:
+``` {r}
+# Test data point
+test_data = data.frame(
+  M = 14.0,
+  So = 0,
+  Ed = 10.0,
+  Po1 = 12.0,
+  Po2 = 15.5,
+  LF = 0.640,
+  M.F = 94.0,
+  Pop = 150,
+  NW = 1.1,
+  U1 = 0.120,
+  U2 = 3.6,
+  Wealth = 3200,
+  Ineq = 20.1,
+  Prob = 0.04,
+  Time = 39.0
+)
+
+# Derive Crime from the sum of intercept & coefficients * test data
+orig_intercept + sum(orig_coeff * test_data) 
+```
+
+Second method, for prediction using PCA transformation & model prediction:
+``` {r}
+# PCA transformation on the test data
+pca_test_data <- data.frame(predict(pca_result, test_data)) 
+
+# Model prediction using only the top 5 components of the test data 
+predict(model, pca_test_data[, 1:5])
+```
+
+From the predictions above, we see that both approaches gave the same prediction of 1388.926 and this prediction is within the range of our training set (342 - 1993). This prediction is also similar to the previous model using the original variables, with a prediction of 1304. Both models seem to have a similar prediction for this test data point.
+
+For this new model using PCA, we observe that the R-squared score is actually lesser than the previous model using original variables (64.5% vs 76.6%); the new model is also poorer when it comes to the difference between multiple R-squared score vs Adjusted R-squared score (about 4% difference vs about 3% difference, the smaller the better), so the new model seem to be performing poorer than the previous model. However, there are still practical benefits to using PCA, such as removing multicollinearity from independent variables as well as having a simple approach to reduce the number of predictors from model training, as opposed to manually filtering for statistically significant variables to reduce the number of predictors.
+
