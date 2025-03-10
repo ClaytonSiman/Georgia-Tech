@@ -55,3 +55,157 @@ For each of the following distributions, give an example of data that you would 
 
 # Question 13.2
 In this problem you can simulate a simplified airport security system at a busy airport. Passengers arrive according to a Poisson distribution with λ1 = 5 per minute (i.e., mean interarrival rate 1 = 0.2 minutes) to the ID/boarding-pass check queue, where there are several servers who each have exponential service time with mean rate 2 = 0.75 minutes. [Hint: model them as one block that has more than one resource.] After that, the passengers are assigned to the shortest of the several personal-check queues, where they go through the personal scanner (time is uniformly distributed between 0.5 minutes and 1 minute). Use the Arena software (PC users) or Python with SimPy (PC or Mac users) to build a simulation of the system, and then vary the number of ID/boarding-pass checkers and personal-check queues to determine how many are needed to keep average wait times below 15 minutes. [If you’re using SimPy, or if you have access to a non-student version of Arena, you can use λ1 = 50 to simulate a busier airport.]
+
+**A:**
+Installing python packages to enable running the simulation on R.
+``` {r, message=FALSE, warning=FALSE}
+library(reticulate)
+py_install(packages = c("simpy", "numpy"))
+```
+
+To create the simulation, we first need to set up the constants that are given in the question to define the premise of this simulation. All the constants are given in the question above
+``` {python, message=FALSE, warning=FALSE} 
+import random
+from numpy import random
+import simpy
+
+# Set seed
+seed = 31
+
+# Constants from the question
+passenger_lam = 5 #passenger arrival lambda = 5
+queue_scale = 1 / 0.75 #scale is the inverse of rate (which is 0.75 from the question)
+scanner_min = 0.5 #scanner minimum process time
+scanner_max = 1.0 #scanner maximum process time
+```
+
+Here, our aim is to find the number of ID/boarding pass check queues and the number of personal scanners in the airport needed to ensure that average waiting times are kept within 15 minutes. From my simulations, I found that minimally the airport will need 3 ID/boarding pass check queues and 2 personal scanners to keep waiting times within 15 minutes. We can set the simulation time here as well, which I have used 2 hours as the simulation time.
+``` {python, message=FALSE, warning=FALSE} 
+# Parameters to tweak
+sim_time = 120 #Number of minutes to run the simulation, let's use 2 hours for this
+num_queues = 3
+num_scanners = 2
+```
+
+Here, we define the airport class with 2 resources: ID/boarding pass checkers & personal scanners. The number of checkers and scanners are from the above parameters.
+
+In the airport class, it also has 2 functions: the check function for ID/boarding pass & the scan function for personal scans. As mentioned in the question, the ID/boarding pass checking follows an exponential distribution while the personal scanner follows a uniform distribution; both functions are defined with their respective distributions.
+
+In the passenger function, we run every passenger through the checking and scanning process. Here, we start measuring the passenger wait times from when they arrive at the airport till they complete the entire checking & scanning process. We then get the wait times of all passengers and find the average waiting time for each configuration of checkers & scanners.
+
+In the setup function, we create the airport class and define the passenger arrivals. As mentioned in the question, passenger arrivals follow a poisson distribution so we will model it as such. With every passenger arrival, we will subject the passenger to the checking and scanning process.
+
+In the simulation, the logs are commented out for brevity.
+``` {python, message=FALSE, warning=FALSE} 
+class Airport(object):
+    '''
+    The airport has 2 resources: the ID/boarding pass checking queue and the personal scanners
+    These 2 resources are defined in the parameters
+    '''
+    def __init__(self, env, queue_scale, scanner_min, scanner_max, num_queues, num_scanners):
+        self.env = env
+        self.checkers = simpy.Resource(env, num_queues)
+        self.scanners = simpy.Resource(env, num_scanners)
+        self.queue_scale = queue_scale
+        self.scanner_min = scanner_min
+        self.scanner_max = scanner_max 
+        
+    def check(self, passenger):
+        '''
+        The ID/Boarding pass checking process based on exponential distribution of mean rate 0.75 minutes
+        '''
+        queue_time = random.exponential(scale=1/self.queue_scale, size=1)[0]
+        yield self.env.timeout(queue_time)
+        
+    def scan(self, passenger):        
+        '''
+        The personal scanner process based on uniform distribution between 0.5 to 1 minute
+        '''
+        scan_time = random.uniform(self.scanner_min, self.scanner_max)
+        yield self.env.timeout(scan_time)
+        
+def passenger(env, name, airport, wait_time_list):
+    '''
+    Passenger that arrives at the airport. 
+    The waiting time starts when they arrive and ends when they complete the final scan.
+    Here they have to go through the ID/boarding pass check and the personal scan
+    '''
+    # print(f'{name} arrives at the airport at {env.now}.')
+    start_time = env.now
+
+    with airport.checkers.request() as request:
+        yield request 
+        
+        # print(f'{name} enters the ID/boarding pass checking queue at {env.now}.')
+        yield env.process(airport.check(name))
+        
+    with airport.scanners.request() as request:
+        yield request 
+        
+        # print(f'{name} enters the personal scanner at {env.now}.')
+        yield env.process(airport.scan(name))
+        
+        # print(f'{name} completes the process at {env.now}.')
+        end_time = env.now
+
+    wait_time_list.append(end_time - start_time) #Get the total wait time of each passenger at the airport
+
+def setup(env, passenger_lam, queue_scale, scanner_min, scanner_max, num_queues, num_scanners, wait_time_list):
+    '''
+    Create the airport object, with passengers arriving at the airport every 0.2 minutes
+    Passenger arrival rate is based on inverse of poisson distribution with lambda of 5
+    '''
+    airport = Airport(env, queue_scale, scanner_min, scanner_max, num_queues, num_scanners)
+
+    passenger_count = 0
+
+    while True:
+        passenger_arrival = random.poisson(lam=passenger_lam, size=1)[0]
+        if passenger_arrival == 0:
+            passenger_arrival = 0.0001
+        yield env.timeout(1/passenger_arrival)
+        passenger_count += 1
+        env.process(passenger(env, f'Passenger {passenger_count}', airport, wait_time_list))
+```
+
+With the setup completed, we can finally run the simulation and identify the average waiting time of passengers when we have 3 ID/boarding pass checking queues & 2 personal scanners at the airport. The average waiting time is about `4.23` minutes.
+``` {python, message=FALSE, warning=FALSE} 
+# Simulation
+random.seed(seed)         
+env = simpy.Environment()
+wait_time_list = []
+
+env.process(setup(env, passenger_lam, queue_scale, scanner_min, scanner_max, num_queues, num_scanners, wait_time_list))
+
+env.run(until=sim_time)
+print(f'The average waiting time for each passenger is {round(sum(wait_time_list) / len(wait_time_list), 2)} minutes')
+```
+
+Extending the simulation further with more passenger arrivals as mentioned in the question, we now define the passenger arrival lambda to be 50 instead of 5.
+
+With more passenger arrivals, we will need 29 ID/boarding pass checking queues & 29 personal scanners at the airport to ensure average waiting times are kept under 15 minutes. With this setup, the average waiting time is about `14.93` minutes.
+``` {python, message=FALSE, warning=FALSE} 
+# Set seed
+seed = 31
+
+# Constants from the question
+passenger_lam = 50 #increase lambda to 50
+queue_scale = 1 / 0.75 #scale is the inverse of rate (which is 0.75 from the question)
+scanner_min = 0.5 #scanner minimum process time
+scanner_max = 1.0 #scanner maximum process time
+
+# Parameters to tweak
+sim_time = 120 #Number of minutes to run the simulation, let's use 2 hours for this
+num_queues = 29
+num_scanners = 29
+
+# Simulation
+random.seed(seed)         
+env = simpy.Environment()
+wait_time_list = []
+
+env.process(setup(env, passenger_lam, queue_scale, scanner_min, scanner_max, num_queues, num_scanners, wait_time_list))
+
+env.run(until=sim_time)
+print(f'The average waiting time for each passenger is {round(sum(wait_time_list) / len(wait_time_list), 2)} minutes')
+```

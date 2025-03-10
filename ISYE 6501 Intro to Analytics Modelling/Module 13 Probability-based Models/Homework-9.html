@@ -394,56 +394,56 @@ feature.</p>
   default.levels = c(&quot;yes&quot;, &quot;no&quot;)
 )</code></pre>
 <pre><code>##    large_yard solar_roof large_garage more_than_2_bathrooms
-## 1          no         no          yes                   yes
-## 2         yes         no          yes                    no
-## 3         yes        yes           no                    no
-## 4         yes         no           no                   yes
-## 5         yes        yes          yes                    no
-## 6          no         no           no                    no
-## 7          no         no          yes                    no
-## 8          no        yes          yes                    no
-## 9          no        yes           no                   yes
-## 10        yes        yes           no                   yes
-## 11         no        yes          yes                   yes
-## 12        yes        yes          yes                   yes
-## 13        yes         no           no                    no
-## 14         no         no           no                   yes
-## 15        yes         no          yes                   yes
-## 16         no        yes           no                    no
+## 1          no         no           no                   yes
+## 2          no        yes           no                   yes
+## 3         yes         no          yes                    no
+## 4          no         no           no                    no
+## 5         yes         no           no                   yes
+## 6         yes        yes          yes                    no
+## 7         yes        yes           no                   yes
+## 8         yes        yes          yes                   yes
+## 9          no         no          yes                   yes
+## 10        yes         no          yes                   yes
+## 11         no         no          yes                    no
+## 12         no        yes           no                    no
+## 13        yes        yes           no                    no
+## 14         no        yes          yes                   yes
+## 15        yes         no           no                    no
+## 16         no        yes          yes                    no
 ##    more_than_3_bedrooms multiple_floors near_public_transport
-## 1                    no             yes                   yes
+## 1                    no              no                    no
 ## 2                   yes              no                   yes
-## 3                    no             yes                   yes
-## 4                   yes             yes                    no
-## 5                    no              no                    no
+## 3                   yes              no                   yes
+## 4                    no              no                    no
+## 5                   yes             yes                    no
 ## 6                    no              no                    no
 ## 7                    no             yes                   yes
-## 8                   yes             yes                    no
-## 9                   yes              no                   yes
-## 10                   no             yes                   yes
-## 11                  yes             yes                    no
-## 12                   no              no                    no
-## 13                  yes             yes                    no
-## 14                   no              no                    no
-## 15                  yes              no                   yes
-## 16                  yes              no                   yes
+## 8                    no              no                    no
+## 9                    no             yes                   yes
+## 10                  yes              no                   yes
+## 11                   no             yes                   yes
+## 12                  yes              no                   yes
+## 13                   no             yes                   yes
+## 14                  yes             yes                    no
+## 15                  yes             yes                    no
+## 16                  yes             yes                    no
 ##    quiet_neighbourhood marble_flooring less_than_10_years_old
-## 1                  yes              no                     no
-## 2                  yes             yes                     no
+## 1                  yes             yes                    yes
+## 2                  yes              no                     no
 ## 3                  yes             yes                     no
-## 4                   no             yes                     no
-## 5                  yes              no                    yes
-## 6                   no              no                     no
-## 7                   no             yes                    yes
-## 8                   no              no                     no
+## 4                   no              no                     no
+## 5                   no             yes                     no
+## 6                  yes              no                    yes
+## 7                   no              no                    yes
+## 8                   no             yes                     no
 ## 9                  yes              no                     no
 ## 10                  no              no                    yes
-## 11                 yes             yes                    yes
-## 12                  no             yes                     no
-## 13                 yes              no                    yes
+## 11                  no             yes                    yes
+## 12                  no             yes                    yes
+## 13                 yes             yes                     no
 ## 14                 yes             yes                    yes
-## 15                  no              no                    yes
-## 16                  no             yes                    yes
+## 15                 yes              no                    yes
+## 16                  no              no                     no
 ## class=design, type= FrF2</code></pre>
 </div>
 <div id="question-13.1" class="section level1">
@@ -492,6 +492,173 @@ ID/boarding-pass checkers and personal-check queues to determine how
 many are needed to keep average wait times below 15 minutes. [If you’re
 using SimPy, or if you have access to a non-student version of Arena,
 you can use λ1 = 50 to simulate a busier airport.]</p>
+<p><strong>A:</strong> Installing python packages to enable running the
+simulation on R.</p>
+<pre class="r"><code>library(reticulate)
+py_install(packages = c(&quot;simpy&quot;, &quot;numpy&quot;))</code></pre>
+<pre><code>## Using virtual environment &quot;C:/Users/Clayton/Documents/.virtualenvs/r-reticulate&quot; ...</code></pre>
+<p>To create the simulation, we first need to set up the constants that
+are given in the question to define the premise of this simulation. All
+the constants are given in the question above</p>
+<pre class="python"><code>import random
+from numpy import random
+import simpy
+
+# Set seed
+seed = 31
+
+# Constants from the question
+passenger_lam = 5 #passenger arrival lambda = 5
+queue_scale = 1 / 0.75 #scale is the inverse of rate (which is 0.75 from the question)
+scanner_min = 0.5 #scanner minimum process time
+scanner_max = 1.0 #scanner maximum process time</code></pre>
+<p>Here, our aim is to find the number of ID/boarding pass check queues
+and the number of personal scanners in the airport needed to ensure that
+average waiting times are kept within 15 minutes. From my simulations, I
+found that minimally the airport will need 3 ID/boarding pass check
+queues and 2 personal scanners to keep waiting times within 15 minutes.
+We can set the simulation time here as well, which I have used 2 hours
+as the simulation time.</p>
+<pre class="python"><code># Parameters to tweak
+sim_time = 120 #Number of minutes to run the simulation, let&#39;s use 2 hours for this
+num_queues = 3
+num_scanners = 2</code></pre>
+<p>Here, we define the airport class with 2 resources: ID/boarding pass
+checkers &amp; personal scanners. The number of checkers and scanners
+are from the above parameters.</p>
+<p>In the airport class, it also has 2 functions: the check function for
+ID/boarding pass &amp; the scan function for personal scans. As
+mentioned in the question, the ID/boarding pass checking follows an
+exponential distribution while the personal scanner follows a uniform
+distribution; both functions are defined with their respective
+distributions.</p>
+<p>In the passenger function, we run every passenger through the
+checking and scanning process. Here, we start measuring the passenger
+wait times from when they arrive at the airport till they complete the
+entire checking &amp; scanning process. We then get the wait times of
+all passengers and find the average waiting time for each configuration
+of checkers &amp; scanners.</p>
+<p>In the setup function, we create the airport class and define the
+passenger arrivals. As mentioned in the question, passenger arrivals
+follow a poisson distribution so we will model it as such. With every
+passenger arrival, we will subject the passenger to the checking and
+scanning process.</p>
+<p>In the simulation, the logs are commented out for brevity.</p>
+<pre class="python"><code>class Airport(object):
+    &#39;&#39;&#39;
+    The airport has 2 resources: the ID/boarding pass checking queue and the personal scanners
+    These 2 resources are defined in the parameters
+    &#39;&#39;&#39;
+    def __init__(self, env, queue_scale, scanner_min, scanner_max, num_queues, num_scanners):
+        self.env = env
+        self.checkers = simpy.Resource(env, num_queues)
+        self.scanners = simpy.Resource(env, num_scanners)
+        self.queue_scale = queue_scale
+        self.scanner_min = scanner_min
+        self.scanner_max = scanner_max 
+        
+    def check(self, passenger):
+        &#39;&#39;&#39;
+        The ID/Boarding pass checking process based on exponential distribution of mean rate 0.75 minutes
+        &#39;&#39;&#39;
+        queue_time = random.exponential(scale=1/self.queue_scale, size=1)[0]
+        yield self.env.timeout(queue_time)
+        
+    def scan(self, passenger):        
+        &#39;&#39;&#39;
+        The personal scanner process based on uniform distribution between 0.5 to 1 minute
+        &#39;&#39;&#39;
+        scan_time = random.uniform(self.scanner_min, self.scanner_max)
+        yield self.env.timeout(scan_time)
+        
+def passenger(env, name, airport, wait_time_list):
+    &#39;&#39;&#39;
+    Passenger that arrives at the airport. 
+    The waiting time starts when they arrive and ends when they complete the final scan.
+    Here they have to go through the ID/boarding pass check and the personal scan
+    &#39;&#39;&#39;
+    # print(f&#39;{name} arrives at the airport at {env.now}.&#39;)
+    start_time = env.now
+
+    with airport.checkers.request() as request:
+        yield request 
+        
+        # print(f&#39;{name} enters the ID/boarding pass checking queue at {env.now}.&#39;)
+        yield env.process(airport.check(name))
+        
+    with airport.scanners.request() as request:
+        yield request 
+        
+        # print(f&#39;{name} enters the personal scanner at {env.now}.&#39;)
+        yield env.process(airport.scan(name))
+        
+        # print(f&#39;{name} completes the process at {env.now}.&#39;)
+        end_time = env.now
+
+    wait_time_list.append(end_time - start_time) #Get the total wait time of each passenger at the airport
+
+def setup(env, passenger_lam, queue_scale, scanner_min, scanner_max, num_queues, num_scanners, wait_time_list):
+    &#39;&#39;&#39;
+    Create the airport object, with passengers arriving at the airport every 0.2 minutes
+    Passenger arrival rate is based on inverse of poisson distribution with lambda of 5
+    &#39;&#39;&#39;
+    airport = Airport(env, queue_scale, scanner_min, scanner_max, num_queues, num_scanners)
+
+    passenger_count = 0
+
+    while True:
+        passenger_arrival = random.poisson(lam=passenger_lam, size=1)[0]
+        if passenger_arrival == 0:
+            passenger_arrival = 0.0001
+        yield env.timeout(1/passenger_arrival)
+        passenger_count += 1
+        env.process(passenger(env, f&#39;Passenger {passenger_count}&#39;, airport, wait_time_list))</code></pre>
+<p>With the setup completed, we can finally run the simulation and
+identify the average waiting time of passengers when we have 3
+ID/boarding pass checking queues &amp; 2 personal scanners at the
+airport. The average waiting time is about <code>4.23</code>
+minutes.</p>
+<pre class="python"><code># Simulation
+random.seed(seed)         
+env = simpy.Environment()
+wait_time_list = []
+
+env.process(setup(env, passenger_lam, queue_scale, scanner_min, scanner_max, num_queues, num_scanners, wait_time_list))</code></pre>
+<pre><code>## &lt;Process(setup) object at 0x2176a7a52e0&gt;</code></pre>
+<pre class="python"><code>env.run(until=sim_time)
+print(f&#39;The average waiting time for each passenger is {round(sum(wait_time_list) / len(wait_time_list), 2)} minutes&#39;)</code></pre>
+<pre><code>## The average waiting time for each passenger is 4.23 minutes</code></pre>
+<p>Extending the simulation further with more passenger arrivals as
+mentioned in the question, we now define the passenger arrival lambda to
+be 50 instead of 5.</p>
+<p>With more passenger arrivals, we will need 29 ID/boarding pass
+checking queues &amp; 29 personal scanners at the airport to ensure
+average waiting times are kept under 15 minutes. With this setup, the
+average waiting time is about <code>14.93</code> minutes.</p>
+<pre class="python"><code># Set seed
+seed = 31
+
+# Constants from the question
+passenger_lam = 50 #increase lambda to 50
+queue_scale = 1 / 0.75 #scale is the inverse of rate (which is 0.75 from the question)
+scanner_min = 0.5 #scanner minimum process time
+scanner_max = 1.0 #scanner maximum process time
+
+# Parameters to tweak
+sim_time = 120 #Number of minutes to run the simulation, let&#39;s use 2 hours for this
+num_queues = 29
+num_scanners = 29
+
+# Simulation
+random.seed(seed)         
+env = simpy.Environment()
+wait_time_list = []
+
+env.process(setup(env, passenger_lam, queue_scale, scanner_min, scanner_max, num_queues, num_scanners, wait_time_list))</code></pre>
+<pre><code>## &lt;Process(setup) object at 0x2176a9f39b0&gt;</code></pre>
+<pre class="python"><code>env.run(until=sim_time)
+print(f&#39;The average waiting time for each passenger is {round(sum(wait_time_list) / len(wait_time_list), 2)} minutes&#39;)</code></pre>
+<pre><code>## The average waiting time for each passenger is 14.93 minutes</code></pre>
 </div>
 
 
