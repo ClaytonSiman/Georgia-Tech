@@ -1,0 +1,165 @@
+---
+title: "Homework 10"
+output: html_document
+date: "2025-03-14"
+---
+
+# Question 14.1
+The breast cancer data set breast-cancer-wisconsin.data.txt from http://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer-wisconsin/  (description at http://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Wisconsin+%28Original%29 ) has missing values.
+
+Initialisation
+``` {r, message=FALSE, warning=FALSE}
+library(Hmisc)
+library(tidyverse)
+library(mice)
+
+# Set seed for reproducibility
+set.seed(31)
+```
+
+Read data in df, rename columns for better readability, and observe the statistics of the dataframe. Here we find that there are only missing data in the `Bare_nuclei` column with 16 observations of `?` values.
+``` {r, message=FALSE, warning=FALSE}
+df <- read.csv("C:/Users/Clayton/Documents/Gatech/ISYE 6501 Intro to Analytics Modelling/Module 15 Optimisation/Homework 10/breast-cancer-wisconsin.data.txt", header = TRUE)
+
+df <- df %>% 
+  rename(
+    Sample_code_number = X1000025,
+    Clump_thickness = X5,
+    Uniformity_of_cell_size = X1,
+    Uniformity_of_cell_shape = X1.1,
+    Marginal_adhesion = X1.2,
+    Single_epithelial_cell_size = X2,
+    Bare_nuclei = X1.3,
+    Bland_chromatin = X3,
+    Normal_nucleoli = X1.4,
+    Mitoses = X1.5,
+    Class = X2.1
+  )
+
+describe(df$Bare_nuclei)
+```
+
+Plotting a histogram of the values in this column for better visualisation. We see that there are some values with `?`.
+``` {r, message=FALSE, warning=FALSE}
+ggplot(df, aes(Bare_nuclei)) +
+  geom_histogram(color = "#000000", fill = "#0099F8", stat="count") +
+  ggtitle("Bare_nuclei") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 18))
+```
+
+## Question 14.1.a
+Use the mean/mode imputation method to impute values for the missing data.
+
+**A:**
+
+First, we create a copy of the df for the mode imputed version.
+``` {r, message=FALSE, warning=FALSE}
+mode_imputed_df <- data.frame(df)
+```
+
+From the histogram, we saw that `1` was the most frequent value for `Bare_nuclei`, therefore, we will impute the missing values with the value of `1`.
+``` {r, message=FALSE, warning=FALSE}
+mode_imputed_df$Bare_nuclei[mode_imputed_df$Bare_nuclei == '?'] <- '1'
+```
+
+After the mode imputation, we see that there are no more missing values of `Bare_nuclei` and the new histogram is shown below:
+``` {r, message=FALSE, warning=FALSE}
+sum(mode_imputed_df == '?')
+
+ggplot(mode_imputed_df, aes(Bare_nuclei)) +
+  geom_histogram(color = "#000000", fill = "#0099F8", stat="count") +
+  ggtitle("Bare_nuclei") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 18))
+```
+
+## Question 14.1.b
+Use regression to impute values for the missing data.
+
+**A:**
+
+First, we create a copy of the df for the linear regression imputed version. Then, we separate the new df into 2: the test set with only missing values & the training set with all populated values. Here, we see that the training set no longer includes any of the missing values.
+``` {r, message=FALSE, warning=FALSE}
+regression_imputed_df <- data.frame(df)
+
+test_set <- regression_imputed_df[regression_imputed_df$Bare_nuclei == '?',]
+train_set <- regression_imputed_df[regression_imputed_df$Bare_nuclei != '?',]
+
+describe(train_set$Bare_nuclei)
+```
+
+We train the linear regression model using the training set with `Bare_nuclei` as the dependent variable. Next, we use the model to predict the values of `Bare_nuclei` for the test set with missing data. We also do a rounding of the predictions since the original values are set as integers. 
+``` {r, message=FALSE, warning=FALSE}
+model <- lm(Bare_nuclei ~ ., data=train_set) 
+
+test_set$Bare_nuclei <- round(predict(model, newdata=test_set), 0)
+```
+
+With the newly imputed data, we now combined the training and test set to create our fully imputed dataset.
+``` {r, message=FALSE, warning=FALSE}
+regression_imputed_df <- rbind(train_set, test_set)
+```
+
+After the linear regression imputation, we see that there are no more missing values of `Bare_nuclei` and the new histogram is shown below:
+``` {r, message=FALSE, warning=FALSE}
+sum(regression_imputed_df == '?')
+
+ggplot(regression_imputed_df, aes(Bare_nuclei)) +
+  geom_histogram(color = "#000000", fill = "#0099F8", stat="count") +
+  ggtitle("Bare_nuclei") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 18))
+```
+
+## Question 14.1.c
+Use regression with perturbation to impute values for the missing data.
+
+**A:**
+
+First, we create a copy of the df for the linear regression with pertubation imputed version. We are also converting the `Bare_nuclei` column into a numeric column to allow for imputation to take place.
+``` {r, message=FALSE, warning=FALSE}
+mice_imputed_df <- data.frame(df)
+mice_imputed_df$Bare_nuclei <- as.numeric(mice_imputed_df$Bare_nuclei)
+```
+
+Now, we use the mice function with the `norm.nob` method to impute the missing values of `Bare_nuclei`. From the summary of the imputation, we see that `Bare_nuclei` has `norm.nob` under its imputation methods.
+``` {r, message=FALSE, warning=FALSE}
+temp_data <- mice(mice_imputed_df, method = 'norm.nob', print=FALSE)
+summary(temp_data)
+```
+
+Finally, we export the imputed data and round the imputed values to integers since `Bare_nuclei` is originally an integer column.
+``` {r, message=FALSE, warning=FALSE}
+mice_imputed_df <- round(complete(temp_data), 0)
+```
+
+After the linear regression with pertubation imputation, we see that there are no more missing values of `Bare_nuclei` and the new histogram is shown below:
+``` {r, message=FALSE, warning=FALSE}
+sum(is.na(mice_imputed_df))
+
+ggplot(mice_imputed_df, aes(Bare_nuclei)) +
+  geom_histogram(color = "#000000", fill = "#0099F8", stat="count") +
+  ggtitle("Bare_nuclei") +
+  theme_classic() +
+  theme(plot.title = element_text(size = 18))
+```
+
+However, we do see that there are imputed values of `Bare_nuclei` with negative values, which are not possible in reality. This shows that when it comes to imputation methods, not all approaches are suitable for every dataset and we need to properly evaluate the imputations before making a decision on the chosen imputation method.
+
+# Question 15.1
+Describe a situation or problem from your job, everyday life, current events, etc., for which optimization would be appropriate. What data would you need? 
+
+**A:** In my job in the food delivery industry, one optimisation we are trying to solve is how to balance spending on marketing incentives and delivery operations. On one hand, spending more on delivery incentives would generate a greater demand for food deliveries; on the other hand, spending more on delivery operations would mean having more delivery riders on shift, thereby increasing the supply of delivery riders. Optimisation will be helpful to determine how we can spend our budget on both aspects to maximise the number of orders we can fulfill while reducing the slack on both demand in orders and supply of delivery riders.
+
+The data we might need are: 
+
+- Expected demand of orders at a given hour
+- Expected increase in demand of orders per dollar spent on marketing incentives 
+- Expected supply of delivery riders at a given hour
+- Expected increase in supply of delivery riders per dollar spent on delivery operations
+- Day of the week
+- Time of the day
+- Maximum budget we can spend
+
+
