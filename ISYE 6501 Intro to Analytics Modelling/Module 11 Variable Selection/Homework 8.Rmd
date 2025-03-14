@@ -1,0 +1,175 @@
+---
+title: "Homework 8"
+output: html_document
+---
+
+# Question 11.1.1
+Using the crime data set uscrime.txt from Questions 8.2, 9.1, and 10.1, build a regression model using Stepwise regression
+
+**A:** 
+
+**General approach:**
+
+- Use LOOCV method for cross validation since we have only a small number of observations to train on
+- Use lmStepAIC method to train the model and evaluate the cross validated model performance
+- Based on the statistical significance of the variables of the trained model, select only the statistical significant variables for the next model training
+- Compare the model performance of the original model and the newly trained model with a subset of variables
+
+Perform initialisation:
+``` {r, message = FALSE}
+# Load required libraries
+library(Hmisc)
+library(caret)
+library(tidyverse)
+library(glmnet)
+
+# Set seed for reproducibility
+set.seed(31)
+``` 
+
+Read the data into a dataframe and observe the statistics
+``` {r}
+df <- read.table("//Users/c.siman/Documents/Gatech/ISYE 6501 Intro to Analytics Modelling/Module 10 Advanced Regression/Homework 7/uscrime.txt", header = TRUE)
+
+describe(df)
+```
+
+Use Leave One Out Cross Validation to train the model since we only have a small number of observations for this dataset. Perform stepwise regression model training using the lmStepAIC method. Observe the model performance and the statistical significance of each variable. (Hiding the CV output for brevity)
+``` {r, results=FALSE}
+ctrl <- trainControl(method="LOOCV")
+stepwise_model <- train(Crime~., data=df, method="lmStepAIC", trControl=ctrl)
+```
+
+``` {r}
+stepwise_model$results
+summary(stepwise_model)
+```
+
+Based on the findings above, we reduce the number of variables used for training further by selecting only those that are statistically significant at a 99% confidence level. (Hiding the CV output for brevity)
+``` {r, results=FALSE}
+stepwise_sig_var_model <- train(Crime ~ M + Ed + Po1 + U2 + Ineq + Prob, data=df, method="lmStepAIC", trControl=ctrl)
+```
+
+``` {r}
+stepwise_sig_var_model$results
+```
+
+From both model performances, we see that from the cross-validated RMSE & R-squared values, the model with only statistically significant variables performed much better (RMSE 221 vs 267, R-squared 67% vs 53%).
+
+# Question 11.1.2
+Using the crime data set uscrime.txt from Questions 8.2, 9.1, and 10.1, build a regression model using Lasso
+
+**A:** 
+
+**General approach:**
+
+- Scale data and store as a matrix
+- Use cross validation of glmnet lasso regression to find the best value of lambda for lasso regression
+- Use this best lambda to train the lasso regression model
+- Find the coefficients of each variable for the model and observe the model performance
+
+Scale the data and store as a matrix
+``` {r}
+x <- scale(as.matrix(df)[,-16], center = TRUE, scale = TRUE)
+y <- scale(as.matrix(df)[,16], center = TRUE, scale = TRUE)
+```
+
+Train the lasso regression model with cross validation to find the best value of lambda.
+``` {r}
+lasso_model <- cv.glmnet(x, y, family="gaussian", alpha=1)
+best_lambda <- lasso_model$lambda.min
+```
+
+The best value of lambda is:
+``` {r, echo=FALSE}
+best_lambda
+```
+
+Train the lasso regression model with the best value of lambda
+``` {r}
+lasso_model <- glmnet(x, y, family="gaussian", alpha=1, lambda=best_lambda)
+```
+
+The coefficients of the variables of the model are:
+``` {r}
+coef(lasso_model)
+```
+
+The RMSE & R-squared values of the model are:
+``` {r, include=FALSE}
+pred <- predict(lasso_model, x)
+SSE <- sum((pred - y)^2)
+SST <- sum((y - mean(y))^2)
+R2 <- 1 - SSE / SST
+RMSE = sqrt(SSE/nrow(df))
+```
+
+``` {r, echo=FALSE}
+cat("RMSE: ", RMSE)
+cat("R-Squared: ", R2)
+```
+
+# Question 11.1.3
+Using the crime data set uscrime.txt from Questions 8.2, 9.1, and 10.1, build a regression model using Elastic net
+
+**A:** 
+
+**General approach:**
+
+- For elastic net regression, we will need to find both the best value of alpha and lambda
+- Loop over multiple values of alpha to train the elastic net model with cross validation to find the best lambda for each value of alpha
+- Store the model performances for each pair of alpha and lambda of the elastic net regression model
+- Choose the best performing model and find its variable coefficients
+
+Create a list and dataframe to store models and model performances
+``` {r}
+models <- list()
+results <- data.frame()
+```
+
+``` {r, include=FALSE}
+set.seed(31)
+```
+
+Loop over values of alpha to train the elastic net model with cross validation to find the best value of lambda for each alpha. Store the model performance for each pair of alpha and lambda. 
+``` {r}
+for (i in 0:20) {
+  # Get value of alpha for this loop
+  name <- paste0("alpha: ", i/20)
+  
+  # Train model and find the best lambda to train the final model
+  models[[name]] <- cv.glmnet(x, y, family="gaussian", alpha=i/20)
+  best_lambda <- models[[name]]$lambda.min
+  models[[name]] <- glmnet(x, y, family="gaussian", alpha=i/20, lambda=best_lambda)
+  
+  # Run predictions with the model
+  pred <- predict(models[[name]], x)
+  
+  # Get model performance
+  SSE <- sum((pred - y)^2)
+  SST <- sum((y - mean(y))^2)
+  R2 <- 1 - SSE / SST
+  RMSE = sqrt(SSE/nrow(df))
+  
+  # Store the results
+  temp <- data.frame(alpha=i/20, lambda=best_lambda, RMSE=RMSE, R2=R2)
+  results <- rbind(results, temp)
+}
+```
+
+From the stored results, find the best performing pair.
+``` {r}
+results
+```
+
+Get the best performing pair to train the final elastic net model and get the variable coefficients of the model.
+``` {r}
+best_results <- results[which.min(results$RMSE),]
+best_results
+
+elastic_net_model <- glmnet(x, y, family="gaussian", alpha=best_results$alpha, lambda=best_results$lambda)
+coef(elastic_net_model)
+
+best_results$RMSE
+best_results$R2
+```

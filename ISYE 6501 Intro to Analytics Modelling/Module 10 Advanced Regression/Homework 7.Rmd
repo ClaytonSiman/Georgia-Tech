@@ -1,0 +1,250 @@
+---
+title: "Homework 7"
+output: html_document
+---
+
+## Question 10.1
+Using the same crime data set uscrime.txt as in Questions 8.2 and 9.1, find the best model you can using 
+(a) a regression tree model, and 
+(b) a random forest model.  
+In R, you can use the tree package or the rpart package, and the randomForest package.  For each model, describe one or two qualitative takeaways you get from analyzing the results (i.e., don’t just stop when you have a good model, but interpret it too).
+
+**A:** 
+
+**General approach:**
+
+- Use LOOCV method for cross validation since we have only a small number of observations to train on
+- Use rpart to train the regression tree model and evaluate the feature importance as well as the RMSE to determine the quality of the model
+- Use random forest to train the random forest model and evaluate the feature importance as well as the RMSE to determine the quality of the model
+- Compare the model performance & findings 
+
+Perform initialisation:
+``` {r message = FALSE}
+# Load required libraries
+library(Hmisc)
+library(caret)
+library(rpart)
+library(rattle)
+library(randomForest)
+library(tidyverse)
+
+# Set seed for reproducibility
+set.seed(31)
+```
+
+First, we read the data into a dataframe and observe the distribution of the data
+``` {r}
+df <- read.table("//Users/c.siman/Documents/Gatech/ISYE 6501 Intro to Analytics Modelling/Module 10 Advanced Regression/Homework 7/uscrime.txt", header = TRUE)
+
+describe(df)
+```
+
+### Regression Tree
+Next, we train the regression tree model using LOOCV to observe the cross-validated model performance 
+``` {r}
+# Specify the cross-validation method
+ctrl <- trainControl(method="LOOCV")
+
+# Fit a CART model and use LOOCV to evaluate performance
+rtree_model_cv <- train(Crime~., data=df, method="rpart", trControl=ctrl)
+```
+
+Here we see that the cross-validated RMSE is about `407`
+``` {r}
+min(rtree_model_cv$results$RMSE)
+```
+
+Train the regression tree model using all variables and observe the model findings
+``` {r}
+rtree_model <- rpart(Crime~., data=df)
+summary(rtree_model)
+```
+
+Plot the resulting tree
+``` {r}
+par(bg = 'white')
+fancyRpartPlot(rtree_model, main="Regression Tree", palettes=c("Blues"), type=1)
+```
+
+Here we see that the most important features are `Po1` and `Po2` by a very large margin
+``` {r}
+rtree_model$variable.importance
+```
+
+### Random Forest
+We train the random forest model using LOOCV to observe the cross-validated model performance 
+``` {r}
+# Specify the cross-validation method
+ctrl <- trainControl(method="LOOCV")
+
+# Fit a random forest model and use LOOCV to evaluate performance
+rf_model_cv <- train(Crime~., data=df, method="rf", trControl=ctrl)
+```
+
+Here we see that the cross-validated RMSE is about `289`, much better than the regression tree model
+``` {r}
+min(rf_model_cv$results$RMSE)
+```
+
+Train the random forest model using all variables and observe the model findings. Since this is a random forest model and is built using multiple trees, we cannot plot the final resulting tree.
+``` {r}
+rf_model <- randomForest(Crime~., data=df)
+summary(rf_model)
+```
+
+Similar to the regression tree, we see that the most important features are `Po1` and `Po2` by a very large margin
+``` {r}
+varImpPlot(rf_model)
+```
+
+### Interpretation
+####Regression Tree
+
+- Much more explainable where we can plot out the resulting tree and understand how the model predicts where each observation will be categorised and determine its response variable
+- However, based on the cross-validated RMSE, it is performing worse than random forest, which is in line with what we expect, where we sacrifice performance for better explainability
+
+#### Random Forest
+
+- From the cross-validated RMSE, the random forest model performs better than the regression tree, which is somewhat expected considering that the random forest is much less explainable than the regression tree model
+- But we are still able to observe the feature importance to better understand how importance each variable is in training the random forest model
+
+## Question 10.2
+Describe a situation or problem from your job, everyday life, current events, etc., for which a logistic regression model would be appropriate. List some (up to 5) predictors that you might use.
+
+**A:**
+In my job, we have customers making purchases with us on the app and one problem that we can tackle is to identify which customers are likely to be at risk of churn.
+A logistic regression model will be appropriate to solve this problem as we will be able to identify the level of risk that a customer is likely to churn, as well as using a threshold to determine whether a customer is likely to churn.
+
+Some predictors we can use are:
+
+- Average order frequency
+- Average order value
+- Days since last order
+- Whether the customer is a new customer
+- City of the customer
+
+## Question 10.3.1
+Using the GermanCredit data set germancredit.txt from http://archive.ics.uci.edu/ml/machine-learning-databases/statlog/german / (description at http://archive.ics.uci.edu/ml/datasets/Statlog+%28German+Credit+Data%29 ), use logistic regression to find a good predictive model for whether credit applicants are good credit risks or not.  Show your model (factors used and their coefficients), the software output, and the quality of fit.  You can use the glm function in R. To get a logistic regression (logit) model on data where the response is either zero or one, use family=binomial(link=”logit”) in your glm function call.
+
+**A:**
+
+**General approach:**
+
+- Read data and rename columns for easy reference
+- Split the dataframe into train and test sets
+- Train the model on train set and observe the resulting model factors & coefficients
+- Run the model on the test set and observe the model performance using AUC
+
+Perform initialisation:
+``` {r message = FALSE}
+# Load required libraries
+library(tidyverse)
+library(pROC)
+```
+
+Read the data into a dataframe and rename columns for easy reference
+``` {r}
+df <- read.table("//Users/c.siman/Documents/Gatech/ISYE 6501 Intro to Analytics Modelling/Module 10 Advanced Regression/Homework 7/germancredit.txt", header = FALSE)
+
+df <- df %>% 
+  rename(
+    checking_acc_status = V1,
+    duration_months = V2,
+    credit_history = V3,
+    purpose = V4,
+    credit_amount = V5,
+    savings_account_or_bonds = V6,
+    employment_since = V7,
+    installment_rate_of_income = V8,
+    personal_status_and_sex = V9,
+    other_debtors = V10,
+    present_residence_since = V11,
+    property = V12,
+    age = V13,
+    other_installment_plans = V14,
+    housing = V15,
+    number_existing_credits = V16,
+    job = V17,
+    number_people_liable_for_maintenance = V18,
+    has_telephone = V19,
+    is_foreign_worker = V20,
+    is_bad_credit = V21
+  )
+```
+
+Next, we transform the response column to a binary variable (0 or 1 instead of 1 or 2) for clarity
+``` {r}
+df$is_bad_credit = df$is_bad_credit - 1
+```
+
+Observe the new dataframe
+``` {r}
+describe(df)
+```
+
+Now we split the dataframe into training and test sets with an 80-20 split
+``` {r}
+df_len <- dim(df)[1]
+test_sample <- sample(1:df_len, size=round(0.2*df_len), replace=FALSE)
+train_set <- df[-test_sample,]
+test_set <- df[test_sample,]
+```
+
+We now train the model using all variables on the training set. With this, we get the following coefficients for each factor:
+``` {r}
+model <- glm(is_bad_credit~., data=train_set, family=binomial(link="logit"))
+summary(model)
+```
+
+Now we observe the predictions of the model on the test set. Looking at the model performance using area under curve (AUC), we see that this model's AUC is about `79%`
+``` {r}
+# Get model predictions on test set
+pred <- predict(model, test_set, type="response")
+
+# Plot ROC & calculate AUC
+roc = roc(test_set$is_bad_credit, pred)
+plot(roc, col="blue")
+auc(test_set$is_bad_credit, pred)
+```
+
+## Question 10.3.2
+Because the model gives a result between 0 and 1, it requires setting a threshold probability to separate between “good” and “bad” answers.  In this data set, they estimate that incorrectly identifying a bad customer as good, is 5 times worse than incorrectly classifying a good customer as bad.  Determine a good threshold probability based on your model.
+
+**A:**
+
+**General approach:**
+
+- Loop over a series of possible thresholds to use and track the `Positive Prediction Rate` & `Overall Accuracy`
+- The aim is to maximise both metrics such that we get a high `Positive Prediction Rate` (to minimise False Positives - i.e. incorrectly identifying bad customers as good) while retaining a high overall accuracy of the model
+- Therefore, we choose a threshold that gets high values for both metrics
+
+Loop over a series of thresholds and track the prediction performance
+``` {r message = FALSE}
+# Create empty lists
+threshold_list <- list()
+pos_pred_list <- list()
+accuracy_list <- list()
+
+# Loop over thresholds and record the prediction performance
+for (threshold in seq(0.2, 0.8, by=0.05)) {
+  binary_pred <- cbind(ifelse(pred>threshold, 1, 0))
+  confusion_matrix <- confusionMatrix(data=as.factor(binary_pred), reference=as.factor(test_set$is_bad_credit))
+  threshold_list <- rbind(threshold_list, threshold)
+  pos_pred_list <- rbind(pos_pred_list, confusion_matrix[["byClass"]][["Pos Pred Value"]])
+  accuracy_list <- rbind(accuracy_list, confusion_matrix[["overall"]][["Accuracy"]])
+}
+```
+
+Plot the accuracy-threshold graph and the positive-prediction-value-threshold graph to find the best possible threshold to use to maximise both metrics.
+``` {r}
+plot(threshold_list, accuracy_list, main="Accuracy vs Threshold", type="l")
+plot(threshold_list, pos_pred_list, main="Positive Prediction Rate vs Threshold", type="l")
+```
+
+From the graphs, we see that the `0.35` threshold maximises both metrics best.
+
+Using the chosen threshold, generate the confusion matrix to observe the model prediction summary
+``` {r}
+binary_pred <- cbind(ifelse(pred>0.35, 1, 0))
+confusionMatrix(data=as.factor(binary_pred), reference=as.factor(test_set$is_bad_credit))
+```
