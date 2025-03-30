@@ -1,0 +1,264 @@
+---
+title: "Homework 11"
+output: html_document
+---
+
+# Question 15.2.1
+Formulate an optimization model (a linear program) to find the cheapest diet that satisfies the maximum and minimum daily nutrition constraints, and solve it using PuLP. Turn in your code and the solution. (The optimal solution should be a diet of air-popped popcorn, poached eggs, oranges, raw iceberg lettuce, raw celery, and frozen broccoli. UGH!)
+
+**A:**
+Installing python packages to enable running the optimisation on R.
+```{r, message=FALSE, warning=FALSE}
+library(reticulate)
+py_install(packages = c("pulp", "pandas"))
+```
+
+Import the installed packages and read the csv into a dataframe on pandas; perform the necessary data transformation on the dataframe for optimisation.
+```{python, message=FALSE, warning=FALSE}
+# Import packages
+from pulp import *
+import pandas as pd
+
+# Read csv files into dataframe
+diet_foods_df = pd.read_csv(r'C:\Users\Clayton\Documents\Gatech\ISYE 6501 Intro to Analytics Modelling\Module 15 Optimisation\Homework 11\diet_foods.csv')
+diet_intake_df = pd.read_csv(r'C:\Users\Clayton\Documents\Gatech\ISYE 6501 Intro to Analytics Modelling\Module 15 Optimisation\Homework 11\diet_daily_intake.csv')
+
+# Convert price column into a float
+diet_foods_df['price'] = diet_foods_df['price'].astype(float)
+```
+
+Prepare and populate the dictionaries to include all food items as well as their characteristics (i.e. price, nutrients).
+```{python, message=FALSE, warning=FALSE}
+# Store all possible food items into a list
+food_list = diet_foods_df['food'].to_list()
+
+# Store all food characteristics into a list
+food_vars_list = diet_foods_df.select_dtypes(include=[float]).columns
+
+# Create an empty dictionary
+food_dict = dict()
+
+for var in food_vars_list:
+  # For every food characteristic, create an empty dictionary
+  food_dict[var] = dict()
+  
+  # For every type of food, record its food characteristic into the dictionary
+  for food in food_list:
+    food_dict[var][food] = diet_foods_df.loc[diet_foods_df['food'] == food][var].values[0]
+```
+
+Prepare the dictionary for daily intake, which includes only the nutrient columns data.
+```{python, message=FALSE, warning=FALSE}
+# Include only nutrient column names into the list
+nutrient_list = diet_foods_df.select_dtypes(include=[float]).columns.drop('price')
+
+# Create empty dictionaries for minimum & maximum daily intakes
+min_intake_dict = dict()
+max_intake_dict = dict()
+
+# For every nutrient, record the value of min & max intake in their respective dictionaries
+for nutrient in nutrient_list:
+  min_intake_dict[nutrient] = diet_intake_df.loc[diet_intake_df['daily_intake'] == 'minimum'][nutrient].values[0]
+  max_intake_dict[nutrient] = diet_intake_df.loc[diet_intake_df['daily_intake'] == 'maximum'][nutrient].values[0]
+```
+
+Create the linear program problem to solve with a minimisation optimisation.
+```{python, message=FALSE, warning=FALSE}
+# Create problem to solve
+diet_prob = LpProblem("diet_problem", LpMinimize)
+```
+
+Create the variable for this problem, for this case, we only have 1 variable: the amount of servings for each food item.
+```{python, message=FALSE, warning=FALSE}
+# Create variables for this problem
+food_vars = LpVariable.dicts("food", food_list, 0)
+```
+
+Create the objective function for this problem, which is to minimise the food costs to meet the daily intake.
+```{python, message=FALSE, warning=FALSE}
+# Objective function to minimize costs
+diet_prob += (
+    lpSum([food_dict['price'][food] * food_vars[food] for food in food_list]),
+    "Total Cost of Food",
+)
+```
+
+Add the constraints for this problem, which is simply the minimum and maximum daily intakes for each nutrient against the sum of each nutrient for the combination of food items.
+```{python, message=FALSE, warning=FALSE}
+# Adding constraints for nutrients of the chosen food items against the minimum and maximum daily intakes
+for nutrient in nutrient_list:
+  diet_prob += (
+      lpSum([food_dict[nutrient][food] * food_vars[food] for food in food_list]) >= min_intake_dict[nutrient],
+      "min_" + nutrient + "_requirement",
+  )
+  diet_prob += (
+      lpSum([food_dict[nutrient][food] * food_vars[food] for food in food_list]) <= max_intake_dict[nutrient],
+      "max_" + nutrient + "_requirement",
+  )
+```
+
+For this problem, the program solved for a combination of 6 food items with a total cost of `$4.34`.
+
+The chosen food items are listed in the output below, which is in line with the hint from the question:
+```{python, message=FALSE, warning=FALSE, eval=FALSE}
+diet_prob.solve()
+
+for v in diet_prob.variables():
+  if v.varValue > 0:
+    print(v.name, "=", v.varValue)
+
+print("Total Cost of Optimal Food Combination = $", round(value(diet_prob.objective), 2))
+```
+
+```{python, message=FALSE, warning=FALSE, echo=FALSE, results=FALSE}
+diet_prob.solve()
+```
+
+```{python, message=FALSE, warning=FALSE, echo=FALSE}
+for v in diet_prob.variables():
+  if v.varValue > 0:
+    print(v.name, "=", v.varValue)
+
+print("Total Cost of Optimal Food Combination = $", round(value(diet_prob.objective), 2))
+```
+
+# Question 15.2.2
+Please add to your model the following constraints (which might require adding more variables) and solve the new model:
+
+- If a food is selected, then a minimum of 1/10 serving must be chosen. (Hint: now you will need two variables for each food i: whether it is chosen, and how much is part of the diet. You’ll also need to write a constraint to link them.)
+- Many people dislike celery and frozen broccoli. So at most one, but not both, can be selected.
+- To get day-to-day variety in protein, at least 3 kinds of meat/poultry/fish/eggs must be selected. [If something is ambiguous (e.g., should bean-and-bacon soup be considered meat?), just call it whatever you think is appropriate – I want you to learn how to write this type of constraint, but I don’t really care whether we agree on how to classify foods!]
+
+To prepare for the 3rd new constraint about meat items, a new list of meat items is created:
+```{python, message=FALSE, warning=FALSE}
+meat_list = [
+  'Roasted Chicken',
+  'Poached Eggs',
+  'Scrambled Eggs',
+  'Bologna,Turkey',
+  'Frankfurter, Beef',
+  'Ham,Sliced,Extralean',
+  'Kielbasa,Prk',
+  'Pizza W/Pepperoni',
+  'Hamburger W/Toppings',
+  'Hotdog, Plain',
+  'Pork',
+  'Sardines in Oil',
+  'White Tuna in Water',
+  'Chicknoodl Soup',
+  'Splt Pea&Hamsoup',
+  'Vegetbeef Soup',
+  'Neweng Clamchwd',
+  'New E Clamchwd,W/Mlk',
+  'Beanbacn Soup,W/Watr'
+]
+```
+
+Create the linear program problem to solve with a minimisation optimisation.
+```{python, message=FALSE, warning=FALSE}
+# Create problem to solve
+more_constraints_diet_prob = LpProblem("diet_problem_more_constraints", LpMinimize)
+```
+
+Create the variables for this problem, for this case, we add a new variable to represent whether a food item is chosen in the final diet
+```{python, message=FALSE, warning=FALSE}
+# Create variables for this problem
+food_vars = LpVariable.dicts("food", food_list, 0)
+is_chosen_vars = LpVariable.dicts("is_chosen", food_list, 0, 1, cat='Binary')
+```
+
+The objective function for this problem remains the same, which is to minimise the food costs to meet the daily intake.
+```{python, message=FALSE, warning=FALSE}
+# Objective function to minimize costs
+more_constraints_diet_prob += (
+    lpSum([food_dict['price'][food] * food_vars[food] for food in food_list]),
+    "Total Cost of Food",
+)
+```
+
+Add the constraints for this problem; for this case, we have 3 new categories of constraints to add:
+
+- Ensure that only chosen food items have positive servings with a minimum of 0.1 servings
+- Ensure that only 1 of Frozen Broccoli or Raw Celery is chosen in the diet, but not both
+- Ensure that there are at least 3 meat items included in the diet
+```{python, message=FALSE, warning=FALSE}
+# Adding constraints 
+## Constraints for nutrients of the chosen food items to meet the minimum and maximum daily intakes
+for nutrient in nutrient_list:
+  more_constraints_diet_prob += (
+      lpSum([food_dict[nutrient][food] * food_vars[food] for food in food_list]) >= min_intake_dict[nutrient],
+      "min_" + nutrient + "_requirement",
+  )
+  more_constraints_diet_prob += (
+      lpSum([food_dict[nutrient][food] * food_vars[food] for food in food_list]) <= max_intake_dict[nutrient],
+      "max_" + nutrient + "_requirement",
+  )
+
+## Constraint 1: Ensure that only chosen food items have a positive serving size with a minimum of 0.1 servings
+## The upper limit of 10**10 is an arbitrary number to ensure that any positive food serving remains below this limit
+for food in food_list:
+  more_constraints_diet_prob += (
+      food_vars[food] <= is_chosen_vars[food] * 10**10,
+      "max_" + food + "_serving",
+  )
+  more_constraints_diet_prob += (
+      food_vars[food] >= 0.1 * is_chosen_vars[food],
+      "min_" + food + "_serving",
+  )
+
+## Constraint 2: Ensure that only 1 of Frozen Broccoli or Raw Celery is chosen in the diet, but not both
+more_constraints_diet_prob += (
+    lpSum([is_chosen_vars[veg] for veg in ['Frozen Broccoli', 'Celery, Raw']]) <= 1,
+    "broccoli_celery_constraint",
+)
+
+## Constraint 3: Ensure that there are at least 3 meat items included in the diet
+## Meat items are defined in the `meat_list` created above
+more_constraints_diet_prob += (
+    lpSum([is_chosen_vars[meat] for meat in meat_list]) >= 3,
+    "min_meat_choices",
+)
+```
+
+For this problem, the program solved for a combination of 8 food items with a total cost of `$4.51`.
+
+With the new constraints, the program optimised to include `Raw Celery` and not `Frozen Broccoli`, and included the minimum serving size of 0.1 for 3 meat items (`Kielbasa Pork`, `Poached Eggs`, `Scrambled Eggs`).
+
+The chosen food items are listed in the output below:
+```{python, message=FALSE, warning=FALSE, eval=FALSE}
+more_constraints_diet_prob.solve()
+
+print("Foods that are included in the diet: \n")
+
+for v in more_constraints_diet_prob.variables():
+  if v.varValue > 0 and 'is_chosen' in v.name:
+    print(v.name)
+
+print("Servings of food that are included in the diet: \n")
+
+for v in more_constraints_diet_prob.variables():
+  if v.varValue > 0 and 'food_' in v.name:
+    print(v.name, "=", v.varValue)
+
+print("Total Cost of Optimal Food Combination = $", round(value(more_constraints_diet_prob.objective), 2))
+```
+
+```{python, message=FALSE, warning=FALSE, echo=FALSE, results=FALSE}
+more_constraints_diet_prob.solve()
+```
+
+```{python, message=FALSE, warning=FALSE, echo=FALSE}
+print("Foods that are included in the diet: \n")
+
+for v in more_constraints_diet_prob.variables():
+  if v.varValue > 0 and 'is_chosen' in v.name:
+    print(v.name)
+
+print("Servings of food that are included in the diet: \n")
+
+for v in more_constraints_diet_prob.variables():
+  if v.varValue > 0 and 'food_' in v.name:
+    print(v.name, "=", v.varValue)
+
+print("Total Cost of Optimal Food Combination = $", round(value(more_constraints_diet_prob.objective), 2))
+```

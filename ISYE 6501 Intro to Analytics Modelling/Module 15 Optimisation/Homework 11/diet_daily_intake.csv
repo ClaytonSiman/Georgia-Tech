@@ -1,0 +1,3 @@
+daily_intake,calories,cholesterol,total_fat,sodium,carbohydrates,dietary_fiber,protein,vit_a,vit_c,calcium,iron
+minimum,1500,30,20,800,130,125,60,1000,400,700,10
+maximum,2500,240,70,2000,450,250,100,10000,5000,1500,40
