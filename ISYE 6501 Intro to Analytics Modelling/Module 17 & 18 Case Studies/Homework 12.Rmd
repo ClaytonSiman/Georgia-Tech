@@ -1,0 +1,31 @@
+---
+title: "Homework 12"
+output: html_document
+---
+
+Describe analytics models and data that could be used to make good recommendations to the power company.
+
+Here are some questions to consider:
+
+- The bottom-line question is which shutoffs should be done each month, given the capacity constraints.  One consideration is that some of the capacity – the workers’ time – is taken up by travel, so maybe the shutoffs can be scheduled in a way that increases the number of them that can be done.
+- Not every shutoff is equal.  Some shutoffs shouldn’t be done at all, because if the power is left on, those people are likely to pay the bill eventually.  How can you identify which shutoffs should or shouldn’t be done?  And among the ones to shut off, how should they be prioritized?
+
+**A:**
+
+For recommendations to the power company, we could use a combination of 3 analytics models/approaches to help with deciding on the shutoffs:
+
+- Decision tree to identify which households should be shutoff
+- Time series models to estimate the cost or bill of each household (this will help with the prioritization of shutoffs)
+- Optimisation to plan out the workers' travel route to maximise the amount saved from shutoffs done each month
+
+1. Identify which households should be shutoff
+
+First, we need to identify which households are likely to be able to pay the bills but chose not to pay the bills. We could use data like monthly income, average of past 6 months bill, average days taken to pay bill, and location, to use a decision tree to predict whether a household is likely to have chosen not to pay bills. We would also need to decide on a threshold for the prediction to determine whether the household should have their power shutoff. We can increase the threshold to be more conservative or decrease the threshold to be more aggressive in our selection.
+
+2. Using the predictions from Step 1 as a filter, estimate the size of the bill for each household; prioritization can be based on the size of the bill in descending order
+
+After filtering for only households that we decided to shutoff from Step 1, we can leverage monthly billing data for each household and use a time series model like SARIMA to predict the likely size of the bill for the current billing month. Using this estimate, we can then prioritize which households to shutoff first.
+
+3. With the prioritizations, we can then optimise the travel routes of workers to maximise the amount saved from shutoffs each month
+
+With the prioritizations from Step 2, we can use the bill estimates as the objective function to maximise amount saved, and working hours, shift schedules, average travel speeds, household location, etc as constraints in the optimisation model to optimise for the largest amount saved through the shutoffs. 
