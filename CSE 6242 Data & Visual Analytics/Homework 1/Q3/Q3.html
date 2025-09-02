@@ -32,13 +32,10 @@
       .attr("id", "svg1")
 	   	// set the id, dimensions and position of the svg element 	
       // .attr("viewBox", [0, 0, width + margin.left + margin.right, height + margin.top + margin.bottom])
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
+      .attr("width", 900)
+      .attr("height", 370)
 	    .append("g")
 	    .attr("id", "container");
-
-      //.append("g") // Append a group element to contain the main plot
-      //.attr("transform", `translate(${margin.left},${margin.top})`);
 
     // Get the data and filter for top 5 most trafficked species
 	  var pathToCsv = "q3.csv";		// path to csv
