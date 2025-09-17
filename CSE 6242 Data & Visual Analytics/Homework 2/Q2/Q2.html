@@ -37,10 +37,12 @@ d3.dsv(",", "board_games.csv", function(d) {
     value: +d.value
   }
 }).then(function(data) {
-
+  console.log(data);
   var links = data;
 
-  var nodes = {};
+  const nodeIds = Array.from(new Set(data.flatMap(d => [d.source, d.target, d.value])));
+  console.log(nodeIds);
+  var nodes = nodeIds.map(id => ({ id }));
 
   // compute the distinct nodes from the links.
   links.forEach(function(link) {
@@ -89,6 +91,11 @@ d3.dsv(",", "board_games.csv", function(d) {
          return (d.name.replace(/\s+/g,'').toLowerCase());
       })
       .attr("r", 5);
+
+  node.append("label")
+    .attr("x", 10)   // offset label horizontally
+    .attr("y", 5)    // small vertical offset
+    .text(link.source);
 
   // add the curvy lines
   function tick() {
