@@ -21,10 +21,6 @@ text {
   pointer-events: none;
 }
 
-.node.pinned circle {
-  fill: black;
-}
-
 </style>
 <meta charset="utf-8">
 <title></title>
@@ -41,45 +37,16 @@ d3.dsv(",", "board_games.csv", function(d) {
     value: +d.value
   }
 }).then(function(data) {
-  
+
   var links = data;
 
-  const nodeIds = Array.from(new Set(data.flatMap(d => [d.source])));
-  
-  //var nodes = nodeIds.map(id => ({ id }));
-  var nodes = {}
-
-  // nodes.forEach(node => {
-  //   node.degree = links.filter(l => l.source === node.id || l.target === node.id).length;
-  // })
+  var nodes = {};
 
   // compute the distinct nodes from the links.
   links.forEach(function(link) {
       link.source = nodes[link.source] || (nodes[link.source] = {name: link.source});
       link.target = nodes[link.target] || (nodes[link.target] = {name: link.target});
   });
-
-  // Calculate node degree
-  for (let link of links) {
-    if (nodes[link.source.name]) {
-      nodes[link.source.name].degree = (nodes[link.source.name].degree || 0) + 1;
-    }
-    if (nodes[link.target.name]) {
-      nodes[link.target.name].degree = (nodes[link.target.name].degree || 0) + 1;
-    }
-  }
-
-  // Get the minimum and maximum degree to define our scale domains
-  const degreeExtent = d3.extent(d3.values(nodes), d => d.degree);
-
-  // Scale the node radius based on degree
-  const radiusScale = d3.scaleLinear()
-    .domain(degreeExtent)
-    .range([5, 20]); // Adjust the range to avoid extreme sizes
-
-  // Scale the node color based on degree using a color gradient
-  const colorScale = d3.scaleSequential(d3.interpolateYlGn)
-    .domain(degreeExtent);
 
   var width = 1200,
       height = 700;
@@ -98,31 +65,19 @@ d3.dsv(",", "board_games.csv", function(d) {
       .attr("width", width)
       .attr("height", height);
 
-  svg.append("text")
-    .attr("id", "credit")
-    .attr("x", width - 500) 
-    .attr("y", 20)
-    .attr("text-anchor", "end") 
-    // .attr("transform", `translate(${margin.left},${margin.top})`)
-    .text("csiman6");
-
   // add the links
   var path = svg.append("g")
       .selectAll("path")
       .data(links)
       .enter()
       .append("path")
-      .attr("class", function(d) { return "link " + d.type; })
-      .style("stroke", d => d.value === 0 ? "gray" : "green")
-      .attr("stroke-width", d => d.value === 0 ? 3 : 1)
-      .attr("stroke-dasharray", d => d.value === 0 ? null : "4 2");
+      .attr("class", function(d) { return "link " + d.type; });
 
   // define the nodes
   var node = svg.selectAll(".node")
       .data(force.nodes())
       .enter().append("g")
       .attr("class", "node")
-      .on("dblclick", dblclick) // Add this line
       .call(d3.drag()
           .on("start", dragstarted)
           .on("drag", dragged)
@@ -133,15 +88,7 @@ d3.dsv(",", "board_games.csv", function(d) {
       .attr("id", function(d){
          return (d.name.replace(/\s+/g,'').toLowerCase());
       })
-      .attr("r", d => radiusScale(d.degree))
-      .style("fill", d => colorScale(d.degree))
-
-  node.append("text")
-    .attr("x", 10)   // offset label horizontally
-    .attr("y", 5)    // small vertical offset
-    .text(function(d){
-       return (d.name.replace(/\s+/g,'').toLowerCase());
-    });
+      .attr("r", 5);
 
   // add the curvy lines
   function tick() {
@@ -166,32 +113,24 @@ d3.dsv(",", "board_games.csv", function(d) {
       if (!d3.event.active) force.alphaTarget(0.3).restart();
       d.fx = d.x;
       d.fy = d.y;
-      d.pinned = true;
-      node.classed("pinned", d => d.pinned);
-      d3.select(this).select("circle").style("fill", "darkred");
-  }
+  };
 
   function dragged(d) {
       d.fx = d3.event.x;
       d.fy = d3.event.y;
-  }
+  };
 
   function dragended(d) {
       if (!d3.event.active) force.alphaTarget(0);
-      d.fx = d.x;
-      d.fy = d.y;
-      d.pinned = true;
-      node.classed("pinned", d => d.pinned);
-      d3.select(this).select("circle").style("fill", "darkred");
-  }
-
-  function dblclick(d) {
-      d.fx = null;
-      d.fy = null;
-      d.pinned = false;
-      node.classed("pinned", d => d.pinned);
-      d3.select(this).select("circle").style("fill", d => colorScale(d.degree));
-  }
+      if (d.fixed == true) {
+          d.fx = d.x;
+          d.fy = d.y;
+      }
+      else {
+          d.fx = null;
+          d.fy = null;
+      }
+  };
   
 }).catch(function(error) {
   console.log(error);

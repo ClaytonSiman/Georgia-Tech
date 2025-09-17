@@ -9,5 +9,311 @@
 </head>
 
 <body>
-  <div id='signature'>gburdell3</div>
+  <div id='signature'>csiman6</div>
+  <script>
+    // define the dimensions and margins for the graph
+    var margin = ({top: 20, right: 100, bottom: 50, left: 100});
+    var width = 900 - margin.left - margin.right;
+    var height = 370 - margin.top - margin.bottom;
+
+    // create scales x & y for X and Y axis and set their ranges
+    var x = d3.scaleTime()
+      .range([0, width]);
+    var y = d3.scaleLinear()
+      .range([height, 0]);
+
+    // append svg element to the body of the page
+    var svg_a = d3.select("body").append("svg")
+      .attr("id", "svg-a")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("id", "plot-a")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    
+    // Chart title
+    svg_a.append("text")
+      .attr("id", "title-a")
+      .attr("x", width / 2)
+      .attr("y", -margin.top + 15)
+      .attr("text-anchor", "middle")
+      .text("Number of Ratings 2016–2020");
+
+    var svg_b = d3.select("body").append("svg")
+      .attr("id", "svg-b")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("id", "plot-b")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    
+    svg_b.append("text")
+      .attr("id", "title-b")
+      .attr("x", width / 2)
+      .attr("y", -margin.top + 15)
+      .attr("text-anchor", "middle")
+      .text("Number of Ratings 2016–2020 with Rankings");
+
+
+    d3.dsv(",", "boardgame_ratings.csv", function (d) {
+      return {
+        date: d3.timeParse("%Y-%m-%d")(d.date),
+        catan_count: +d['Catan=count'],
+        catan_rank: +d['Catan=rank'],
+        dominion_count: +d['Dominion=count'],
+        dominion_rank: +d['Dominion=rank'],
+        codenames_count: +d['Codenames=count'],
+        codenames_rank: +d['Codenames=rank'],
+        terraforming_mars_count: +d['Terraforming Mars=count'],
+        terraforming_mars_rank: +d['Terraforming Mars=rank'],
+        gloomhaven_count: +d['Gloomhaven=count'],
+        gloomhaven_rank: +d['Gloomhaven=rank'],
+        mtg_count: +d['Magic: The Gathering=count'],
+        mtg_rank: +d['Magic: The Gathering=rank'],
+        dixit_count: +d['Dixit=count'],
+        dixit_rank: +d['Dixit=rank'],
+        monopoly_count: +d['Monopoly=count'],
+        monopoly_rank: +d['Monopoly=rank']
+      };
+    }).then(function (data) {
+
+      // Chart A: Ratings
+      // Define the keys for the count data
+      const keysA = ["catan_count", "codenames_count", "terraforming_mars_count", "gloomhaven_count", "dominion_count", "mtg_count", "dixit_count", "monopoly_count"];
+      
+      // Transform the data into an array of objects
+      const seriesA = keysA.map(key => {
+        return {
+          name: key.replace('_count', '').replace(/_/g, ' '),
+          values: data.map(d => ({date: d.date, value: d[key]}))
+        };
+      });
+
+      // Set the domains for the scales
+      x.domain(d3.extent(data, d => d.date));
+      y.domain([0, d3.max(seriesA, s => d3.max(s.values, d => d.value))]);
+
+      // Add the X axis
+      svg_a.append("g")
+          .attr("id", "x-axis-a")
+          .attr("transform", `translate(0,${height})`)
+          .style("font-size", "10px")
+          .call(d3.axisBottom(x)
+              .ticks(d3.timeMonth.every(3))
+              .tickFormat(d3.timeFormat("%b %y")));
+
+      // Add the Y axis
+      svg_a.append("g")
+          .attr("id", "y-axis-a")
+          .style("font-size", "10px")
+          .call(d3.axisLeft(y).ticks(5));
+
+      // Add the X axis label
+      svg_a.append("text")
+          .attr("x", width / 2)
+          .attr("y", height + margin.bottom - 10)
+          .attr("text-anchor", "middle")
+          .style("font-size", "12px")
+          .text("Month");
+
+      // Add the Y axis label
+      svg_a.append("text")
+          .attr("transform", "rotate(-90)")
+          .attr("y", -margin.left + 10)
+          .attr("x", -height / 2)
+          .attr("dy", "1em")
+          .attr("text-anchor", "middle")
+          .style("font-size", "12px")
+          .text("Num of Ratings");
+
+      // Define a color scale
+      var zA = d3.scaleOrdinal(d3.schemeCategory10);
+      zA.domain(keysA);
+
+      // Define the line generator
+      const lineA = d3.line()
+          .x(d => x(d.date))
+          .y(d => y(d.value));
+
+      // Draw the lines
+      const lineGroupA = svg_a.selectAll(".line-group-a")
+          .data(seriesA)
+          .enter().append("g")
+          .attr("id", "lines-a")
+          .attr("class", "line-group-a");
+
+      lineGroupA.append("path")
+          .attr("d", d => lineA(d.values))
+          .style("fill", "none")
+          .style("stroke-width", "2px")
+          .style("stroke", d => zA(d.name.replace(/ /g, '_') + '_count'));
+
+      // Add a label for each line
+      lineGroupA.append("text")
+          .datum(d => ({name: d.name, value: d.values[d.values.length - 1]}))
+          .attr("transform", d => `translate(${x(d.value.date)},${y(d.value.value)})`)
+          .attr("x", 5)
+          .attr("dy", "0.35em")
+          .style("font-size", "10px")
+          .style("fill", d => zA(d.name.replace(/ /g, '_') + '_count'))
+          .text(d => d.name);
+
+      // Chart B: Ratings with Rankings
+      const keysB = ["catan_count", "codenames_count", "terraforming_mars_count", "gloomhaven_count"];
+      const rankKeysB = ["catan_rank", "codenames_rank", "terraforming_mars_rank", "gloomhaven_rank"];
+      
+      const seriesB = keysB.map(key => {
+        return {
+          name: key.replace('_count', '').replace(/_/g, ' '),
+          values: data.map(d => ({date: d.date, value: d[key]})).filter(d => d.value != null && !isNaN(d.value))
+        };
+      });
+      const rankSeriesB = rankKeysB.map(key => {
+        return {
+          name: key.replace('_rank', '').replace(/_/g, ' '),
+          values: data.map(d => ({date: d.date, value: d[key], count: d[key.replace('_rank', '_count')]})).filter(d => d.value != null && !isNaN(d.value) && d.count != null && !isNaN(d.count))
+        };
+      });
+
+      // Define the line generator
+      const lineAB = d3.line()
+          .x(d => x(d.date))
+          .y(d => y(d.value));
+
+      // Draw the lines
+      const lineGroupAB = svg_b.selectAll(".line-group-b")
+          .data(seriesA)
+          .enter().append("g")
+          .attr("id", "lines-b")
+          .attr("class", "line-group-b");
+
+      lineGroupAB.append("path")
+          .attr("d", d => lineAB(d.values))
+          .style("fill", "none")
+          .style("stroke-width", "2px")
+          .style("stroke", d => zA(d.name.replace(/ /g, '_') + '_count'));
+
+      // Add a label for each line
+      lineGroupAB.append("text")
+          .datum(d => ({name: d.name, value: d.values[d.values.length - 1]}))
+          .attr("transform", d => `translate(${x(d.value.date)},${y(d.value.value)})`)
+          .attr("x", 5)
+          .attr("dy", "0.35em")
+          .style("font-size", "10px")
+          .style("fill", d => zA(d.name.replace(/ /g, '_') + '_count'))
+          .text(d => d.name);
+
+      // Add axes and labels for the second chart
+      svg_b.append("g")
+          .attr("id", "x-axis-b")
+          .attr("transform", `translate(0,${height})`)
+          .style("font-size", "10px")
+          .call(d3.axisBottom(x)
+              .ticks(d3.timeMonth.every(3))
+              .tickFormat(d3.timeFormat("%b %y")));
+
+      svg_b.append("g")
+          .attr("id", "y-axis-b")
+          .style("font-size", "10px")
+          .call(d3.axisLeft(y).ticks(5));
+
+      svg_b.append("text")
+          .attr("x", width / 2)
+          .attr("y", height + margin.bottom - 10)
+          .attr("text-anchor", "middle")
+          .style("font-size", "12px")
+          .text("Month");
+
+      svg_b.append("text")
+          .attr("transform", "rotate(-90)")
+          .attr("y", -margin.left + 10)
+          .attr("x", -height / 2)
+          .attr("dy", "1em")
+          .attr("text-anchor", "middle")
+          .style("font-size", "12px")
+          .text("Num of Ratings");
+
+      // Add lines with circle markers
+      var zB = d3.scaleOrdinal(d3.schemeCategory10);
+      zB.domain(keysB);
+
+      const lineB = d3.line()
+          .x(d => x(d.date))
+          .y(d => y(d.value));
+
+      const lineGroupB = svg_b.selectAll(".line-group-b")
+          .data(seriesB)
+          .enter().append("g")
+          .attr("id", "symbols-b")
+          .attr("class", "line-group-b");
+
+      // lineGroupB.append("path")
+      //     .attr("d", d => lineB(d.values))
+      //     .style("fill", "none")
+      //     .style("stroke-width", "2px")
+      //     .style("stroke", d => zB(d.name.replace(/ /g, '_') + '_count'));
+
+      // lineGroupB.append("text")
+      //     .datum(d => ({name: d.name, value: d.values[d.values.length - 1]}))
+      //     .attr("transform", d => `translate(${x(d.value.date)},${y(d.value.value)})`)
+      //     .attr("x", 15)
+      //     .attr("dy", "0.35em")
+      //     .style("font-size", "10px")
+      //     .style("fill", d => zA(d.name.replace(/ /g, '_') + '_count'))
+      //     .text(d => d.name);
+
+      // svg_b.append("g")
+      //     .attr("id", "symbols-b")
+
+      // Add circle markers with ranking text
+      rankSeriesB.forEach(s => {
+        const markers = s.values.filter((d, i) => i % 3 === 0);
+
+        svg_b.selectAll(null)
+          .data(markers)
+          .enter()
+          .append("circle")
+          .attr("r", 10)
+          .attr("cx", d => x(d.date))
+          .attr("cy", d => y(d.count))
+          .style("fill", zB(s.name.replace(/ /g, '_') + '_count'))
+          .style("stroke", "white")
+          .style("stroke-width", "1.5px");
+
+        svg_b.selectAll(null)
+          .data(markers)
+          .enter()
+          .append("text")
+          .attr("x", d => x(d.date))
+          .attr("y", d => y(d.count))
+          .attr("dy", "0.35em")
+          .attr("text-anchor", "middle")
+          .style("fill", "white")
+          .style("font-size", "7px")
+          .style("font-weight", "bold")
+          .text(d => d.value);
+      });
+
+      // Add a legend for the circle markers
+      // svg_b.append("g")
+      //     .attr("id", "legend-b")
+
+
+      const legend = svg_b.append("g")
+          .attr("id", "legend-b")
+
+      legend.append("text")
+          .attr("transform", `translate(${width + 10}, ${height})`)
+          .text("Circles = Ranking")
+          .style("font-size", "10px")
+          
+      legend.append("circle")
+          .attr("transform", `translate(${width + 45}, ${height-25})`)
+          .attr("r", 10)
+          .style("fill", "black"); // You can use any color that contrasts well
+
+    }).catch(function(error) {
+      console.log(error);
+    });
+  </script>
 </body>
