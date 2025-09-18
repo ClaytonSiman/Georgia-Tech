@@ -21,6 +21,9 @@
   <script>
     // define the dimensions and margins for the line chart
     // Use the Margin Convention referenced in the HW document to layout your graph
+    const margin = { top: 20, right: 20, bottom: 40, left: 50 };
+    const width = 800 - margin.left - margin.right;
+    const height = 500 - margin.top - margin.bottom;
 
 
     // define the dimensions and margins for the bar chart
@@ -40,17 +43,99 @@
         "translate(" + margin.left + "," + margin.top + ")");
 
     // Fetch the data
-	var pathToCsv = "";
+	var pathToCsv = "average-rating.csv";
 
 
     d3.dsv(",", pathToCsv, function (d) {
       return {
-        // format data attributes if required
+        name: d.name,
+        year: +d.year,
+        average_rating: +d.average_rating,
+        users_rated: +d.users_rated
       }
     }).then(function (data) {
       console.log(data); // you should see the data in your browser's developer tools console
 
       /* Create bar plot using data from csv */
+      const years = ["2015", "2016", "2017", "2018", "2019"];
+      const ratingsRange = d3.range(1, 11);
+
+      const filteredData = data.filter(d => years.includes(d.year));
+
+      // Group and summarize data using d3.nest()
+      const yearlyData = d3.nest()
+          .key(d => d.year)
+          .key(d => Math.floor(d.average_rating))
+          .rollup(v => v.length)
+          .entries(filteredData)
+          .map(yearGroup => {
+              const summaryMap = new Map(yearGroup.values.map(d => [d.key, d.value]));
+              const processed = ratingsRange.map(rating => ({
+                  rating: rating,
+                  count: summaryMap.get(String(rating)) || 0
+              }));
+              return {
+                  year: yearGroup.key,
+                  values: processed
+              };
+          });
+
+      // Set scales
+      const x = d3.scaleLinear()
+          .domain([1, 10])
+          .range([0, width]);
+
+      const y = d3.scaleLinear()
+          .domain([0, d3.max(yearlyData, year => d3.max(year.values, d => d.count))])
+          .nice()
+          .range([height, 0]);
+
+      const color = d3.scaleOrdinal(d3.schemeCategory10)
+          .domain(years);
+
+      // Add the x-axis
+      svg.append("g")
+          .attr("transform", `translate(0,${height})`)
+          .call(d3.axisBottom(x).tickValues(ratingsRange));
+
+      // Add the y-axis
+      svg.append("g")
+          .call(d3.axisLeft(y));
+
+      // Add axis labels
+      svg.append("text")
+          .attr("class", "x label")
+          .attr("text-anchor", "middle")
+          .attr("x", width / 2)
+          .attr("y", height + 35)
+          .text("Average Rating (Rounded Down)");
+
+      svg.append("text")
+          .attr("class", "y label")
+          .attr("text-anchor", "middle")
+          .attr("y", -35)
+          .attr("x", -height / 2)
+          .attr("transform", "rotate(-90)")
+          .text("Count of Board Games");
+
+      // Line generator
+      const line = d3.line()
+          .x(d => x(d.rating))
+          .y(d => y(d.count));
+
+      // Draw the lines
+      const yearGroups = svg.selectAll(".line-group")
+          .data(yearlyData)
+          .enter()
+          .append("g")
+          .attr("class", "line-group");
+
+      yearGroups.append("path")
+          .attr("class", "line")
+          .attr("d", d => line(d.values))
+          .style("stroke", d => color(d.year))
+          .style("fill", "none")
+          .style("stroke-width", 2.5);
 
 
 
