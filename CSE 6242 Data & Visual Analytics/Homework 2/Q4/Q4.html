@@ -66,7 +66,7 @@
     // Bar chart title
     const barTitle = d3.select("body")
         .append("text")
-        .attr("id", "bar-chart-title")
+        .attr("id", "bar_chart_title")
         .attr("x", barWidth / 2)
         .attr("y", 0)
         .attr("text-anchor", "middle");
@@ -77,24 +77,28 @@
         .attr("id", "bar_chart")
         .attr("width", barWidth + barMargin.left + barMargin.right)
         .attr("height", barHeight + barMargin.top + barMargin.bottom)
-        .append("g")
+        .attr("transform", `translate(100, 0)`);
+        
+    const barContainer = barSvg.append("g")
         .attr("id", "container_2")
+        .attr("width", barWidth)
+        .attr("height", barHeight)
         .attr("transform", `translate(${barMargin.left},${barMargin.top})`);
 
-    const barGroup = barSvg.append("g")
+    const barGroup = barContainer.append("g")
         .attr("id", "bars");
     
     // Bar chart elements
-    const barXAxisGroup = barSvg.append("g")
+    const barXAxisGroup = barContainer.append("g")
         .attr("id", "x-axis-bars")
         .attr("class", "x-axis")
         .attr("transform", `translate(0,${barHeight})`);
     
-    const barYAxisGroup = barSvg.append("g")
+    const barYAxisGroup = barContainer.append("g")
         .attr("id", "y-axis-bars")
         .attr("class", "y-axis");
 
-    barSvg.append("text")
+    barContainer.append("text")
         .attr("id", "bar_x_axis_label")
         .attr("class", "x-axis-label")
         .attr("x", barWidth / 2)
@@ -102,7 +106,7 @@
         .style("text-anchor", "middle")
         .text("Number of users");
 
-    barSvg.append("text")
+    barContainer.append("text")
         .attr("id", "bar_y_axis_label")
         .attr("class", "y-axis-label")
         .attr("x", -barHeight / 2)
@@ -274,6 +278,7 @@
                   .duration(100)
                   .attr("r", 4);
               clearBarChart();
+              d3.select("#bar_chart").select("#container_2").remove(); 
           });
         // Add a single group for the entire legend
         const legendContainer = svg.append("g")
@@ -308,6 +313,8 @@
             // Show the bar chart container
             barTitle.style("display", "block");
             barSvg.style("display", "block");
+            d3.select("#bar_chart").select("#container_2").remove(); 
+            // clearBarChart();
 
             // const bars = barGroup.selectAll(".bar")
             
@@ -316,7 +323,25 @@
 
             barTitle.text(`Top 5 Most Rated Games of ${year} with Rating ${rating}`);
 
-            barSvg.append("text")
+            const barContainer = barSvg.append("g")
+                .attr("id", "container_2")
+
+            const barGroup = barContainer.append("g")
+                .attr("id", "bars")
+                .attr("transform", `translate(150,0)`);
+            
+            // Bar chart elements
+            const barXAxisGroup = barContainer.append("g")
+                .attr("id", "x-axis-bars")
+                .attr("class", "x-axis")
+                .attr("transform", `translate(150,${barHeight})`);
+            
+            const barYAxisGroup = barContainer.append("g")
+                .attr("id", "y-axis-bars")
+                .attr("class", "y-axis")
+                .attr("transform", `translate(150,0)`);
+
+            barContainer.append("text")
                 .attr("id", "bar_x_axis_label")
                 .attr("class", "x-axis-label")
                 .attr("x", barWidth / 2)
@@ -324,12 +349,13 @@
                 .style("text-anchor", "middle")
                 .text("Number of users");
 
-            barSvg.append("text")
+            barContainer.append("text")
                 .attr("id", "bar_y_axis_label")
                 .attr("class", "y-axis-label")
-                .attr("x", -barHeight / 2)
-                .attr("y", -100)
-                .attr("transform", "rotate(-90)")
+                .attr("x", barHeight / 2)
+                .attr("y", 250)
+                .attr("transform", "rotate(90)")
+                .attr("transform", `translate(-150,0)`)
                 .style("text-anchor", "middle")
                 .text("Games");
                 
@@ -368,12 +394,15 @@
 
             if (count == 0) {
               clearBarChart()
+              // const barContainer = barSvg.append("g")
+              //   .attr("id", "container_2")
             }
         }
 
         function clearBarChart() {
             barTitle.style("display", "none");
             barSvg.style("display", "none");
+            
         }
 
 
